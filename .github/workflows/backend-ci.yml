@@ -1,0 +1,49 @@
+name: backend-ci
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: helm
+          POSTGRES_PASSWORD: helm
+          POSTGRES_DB: helm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U helm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      HELM_SECRET_KEY: ci-only-secret-key
+      HELM_DATABASE_URL: postgresql+asyncpg://helm:helm@localhost:5432/helm
+      HELM_ALLOWED_HOSTS: '["http://localhost:5173"]'
+      HELM_SYNC_TOKEN: ci-only-sync-token
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      - name: Install dependencies
+        run: uv sync
+      - name: Run migrations
+        run: uv run alembic upgrade head
+      - name: Run tests with coverage gate
+        run: uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=70
