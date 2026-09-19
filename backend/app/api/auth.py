@@ -1,9 +1,10 @@
 import secrets
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.users import UserManager, auth_backend, fastapi_users, get_user_manager
 from app.db.session import get_async_session
 from app.models.user import User
@@ -11,8 +12,19 @@ from app.schemas.user import UserCreate, UserRead, UserUpdate
 
 router = APIRouter()
 
+
+def require_registration_enabled() -> None:
+    if not settings.allow_registration:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Registration is disabled")
+
+
 router.include_router(fastapi_users.get_auth_router(auth_backend), prefix="/auth", tags=["auth"])
-router.include_router(fastapi_users.get_register_router(UserRead, UserCreate), prefix="/auth", tags=["auth"])
+router.include_router(
+    fastapi_users.get_register_router(UserRead, UserCreate),
+    prefix="/auth",
+    tags=["auth"],
+    dependencies=[Depends(require_registration_enabled)],
+)
 router.include_router(fastapi_users.get_users_router(UserRead, UserUpdate), prefix="/users", tags=["users"])
 
 DEMO_EMAIL = "demo@helm.billtoolbox.com"

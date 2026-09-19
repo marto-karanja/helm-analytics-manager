@@ -12,6 +12,8 @@ import asyncpg
 _dev_url = os.environ.get("HELM_DATABASE_URL", "postgresql+asyncpg://helm:helm@localhost:5433/helm")
 _test_db_name = re.search(r"/([^/]+)$", _dev_url).group(1) + "_test"
 os.environ["HELM_DATABASE_URL"] = re.sub(r"/[^/]+$", f"/{_test_db_name}", _dev_url)
+# Fixtures create users through the public register endpoint, which is off by default.
+os.environ["HELM_ALLOW_REGISTRATION"] = "true"
 
 
 async def _ensure_test_database_exists() -> None:

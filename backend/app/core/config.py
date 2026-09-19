@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     allowed_hosts: list[str] = ["localhost", "127.0.0.1"]
     sync_token: str
     demo_mode_seed: bool = False
+    allow_registration: bool = False
     access_token_lifetime_seconds: int = 3600 * 24
 
 
