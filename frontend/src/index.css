@@ -11,27 +11,44 @@
   --color-primary: oklch(0.25 0.02 260);
   --color-primary-foreground: oklch(0.98 0 0);
   --color-destructive: oklch(0.55 0.22 25);
+  --color-destructive-foreground: oklch(1 0 0);
   --color-accent: oklch(0.96 0 0);
   --color-accent-foreground: oklch(0.15 0 0);
-  --color-severity-green: oklch(0.6 0.15 150);
+  --color-severity-green: oklch(0.52 0.14 150);
+  --color-severity-green-foreground: oklch(1 0 0);
   --color-severity-yellow: oklch(0.75 0.15 90);
+  --color-severity-yellow-foreground: oklch(0.15 0 0);
   --color-severity-red: oklch(0.55 0.22 25);
+  --color-severity-red-foreground: oklch(1 0 0);
 }
 
-@media (prefers-color-scheme: dark) {
-  @theme {
-    --color-background: oklch(0.16 0 0);
-    --color-foreground: oklch(0.95 0 0);
-    --color-card: oklch(0.2 0 0);
-    --color-card-foreground: oklch(0.95 0 0);
-    --color-border: oklch(0.3 0 0);
-    --color-muted: oklch(0.24 0 0);
-    --color-muted-foreground: oklch(0.65 0 0);
-    --color-primary: oklch(0.9 0.02 260);
-    --color-primary-foreground: oklch(0.15 0 0);
-    --color-accent: oklch(0.26 0 0);
-    --color-accent-foreground: oklch(0.95 0 0);
-  }
+/* The dark palette is keyed off a class, not prefers-color-scheme, so the
+   Light/Dark/System toggle and the OS setting resolve to the same mechanism.
+   Tailwind v4 also hoists @theme out of media queries, so it can't live there. */
+.dark {
+  --color-background: oklch(0.16 0 0);
+  --color-foreground: oklch(0.95 0 0);
+  --color-card: oklch(0.2 0 0);
+  --color-card-foreground: oklch(0.95 0 0);
+  --color-border: oklch(0.3 0 0);
+  --color-muted: oklch(0.24 0 0);
+  --color-muted-foreground: oklch(0.65 0 0);
+  --color-primary: oklch(0.9 0.02 260);
+  --color-primary-foreground: oklch(0.15 0 0);
+  --color-destructive: oklch(0.68 0.19 25);
+  --color-destructive-foreground: oklch(0.15 0 0);
+  --color-accent: oklch(0.26 0 0);
+  --color-accent-foreground: oklch(0.95 0 0);
+  --color-severity-green: oklch(0.68 0.16 150);
+  --color-severity-green-foreground: oklch(0.15 0 0);
+}
+
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
 }
 
 body {

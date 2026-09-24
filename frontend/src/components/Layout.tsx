@@ -1,5 +1,6 @@
 import { LayoutGrid, ListChecks, LogOut } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
@@ -33,6 +34,7 @@ export function Layout() {
             <NavLink to="/tasks" className={navLinkClass}>
               <ListChecks size={16} /> Tasks
             </NavLink>
+            <ThemeToggle className="mx-1" />
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut size={16} /> Log out
             </Button>

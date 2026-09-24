@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
@@ -94,6 +95,9 @@ export function LoginPage() {
           >
             {demoLoading ? 'Starting demo…' : 'Log in as Demo'}
           </Button>
+          <div className="mt-4 flex justify-center">
+            <ThemeToggle />
+          </div>
         </CardContent>
       </Card>
     </div>
