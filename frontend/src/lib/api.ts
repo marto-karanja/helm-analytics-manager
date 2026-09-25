@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Project, ProjectDetail, Task } from './types'
+import type { Project, ProjectDetail, Task, TrafficData, TrafficOverviewItem } from './types'
 
 export const TOKEN_STORAGE_KEY = 'helm_access_token'
 
@@ -38,6 +38,16 @@ export async function fetchProjects(): Promise<Project[]> {
 
 export async function fetchProject(id: string): Promise<ProjectDetail> {
   const resp = await api.get<ProjectDetail>(`/projects/${id}`)
+  return resp.data
+}
+
+export async function fetchTraffic(projectId: string, days: number): Promise<TrafficData> {
+  const resp = await api.get<TrafficData>(`/projects/${projectId}/traffic`, { params: { days } })
+  return resp.data
+}
+
+export async function fetchTrafficOverview(): Promise<TrafficOverviewItem[]> {
+  const resp = await api.get<TrafficOverviewItem[]>('/traffic/overview')
   return resp.data
 }
 

@@ -1,7 +1,9 @@
 import * as React from 'react'
-import { useParams } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { BacklogChart } from '@/components/BacklogChart'
 import { TaskBoard } from '@/components/TaskBoard'
+import { TrafficSection } from '@/components/TrafficSection'
 import { SeverityBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,6 +25,7 @@ export function ProjectDetailPage() {
   const [drafts, setDrafts] = React.useState<Record<string, string>>({})
   const [saving, setSaving] = React.useState<string | null>(null)
   const { isDemo } = useAuth()
+  const { hash } = useLocation()
 
   React.useEffect(() => {
     if (!projectId) return
@@ -37,6 +40,11 @@ export function ProjectDetailPage() {
     })
   }, [projectId])
 
+  // Deep links like /projects/:id#traffic (from the Traffic page) can only scroll once the section has rendered.
+  React.useEffect(() => {
+    if (project && hash) document.getElementById(hash.slice(1))?.scrollIntoView()
+  }, [project, hash])
+
   async function handleSave(field: (typeof EDITABLE_FIELDS)[number]['key']) {
     if (!project) return
     setSaving(field)
@@ -50,10 +58,11 @@ export function ProjectDetailPage() {
 
   if (!project) return <p className="text-sm text-muted-foreground">Loading…</p>
 
-  const latestTraffic = project.traffic_snapshots[0]
-
   return (
     <div className="flex flex-col gap-6">
+      <Link to="/" className="flex items-center gap-1 self-start text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft size={14} /> Overview
+      </Link>
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-semibold">{project.name}</h1>
@@ -107,31 +116,7 @@ export function ProjectDetailPage() {
         </Card>
       )}
 
-      {project.is_pipeline && latestTraffic?.configured && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Search traffic (7d vs. prior 7d)</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3 text-sm">
-            {(['clicks', 'impressions', 'sessions'] as const).map((metric) => {
-              const trend = latestTraffic[metric]
-              if (!trend) return null
-              return (
-                <div key={metric}>
-                  <p className="text-muted-foreground capitalize">{metric}</p>
-                  <p className="text-lg font-semibold">{trend.recent}</p>
-                  {trend.pct_change !== null && (
-                    <p className={trend.pct_change < 0 ? 'text-destructive' : 'text-severity-green'}>
-                      {trend.pct_change > 0 ? '+' : ''}
-                      {trend.pct_change}%
-                    </p>
-                  )}
-                </div>
-              )
-            })}
-          </CardContent>
-        </Card>
-      )}
+      {project.is_pipeline && <TrafficSection project={project} isDemo={isDemo} />}
 
       <Card>
         <CardHeader>

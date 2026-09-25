@@ -44,18 +44,54 @@ export interface PipelineSnapshot {
   alert_messages: { severity: string; message: string }[] | null
 }
 
+export interface TrafficTrend {
+  recent: number
+  prior: number
+  pct_change: number | null
+}
+
 export interface TrafficSnapshot {
   id: string
   synced_at: string
   configured: boolean
-  clicks: { recent: number; prior: number; pct_change: number | null } | null
-  impressions: { recent: number; prior: number; pct_change: number | null } | null
-  sessions: { recent: number; prior: number; pct_change: number | null } | null
+  clicks: TrafficTrend | null
+  impressions: TrafficTrend | null
+  sessions: TrafficTrend | null
   alert_severity: string | null
   alert_messages: { severity: string; message: string }[] | null
 }
 
+export interface TrafficDay {
+  metric_date: string
+  clicks: number | null
+  impressions: number | null
+  ctr: number | null
+  avg_position: number | null
+  sessions: number | null
+  engaged_sessions: number | null
+}
+
+export interface TrafficData {
+  days: TrafficDay[]
+  last_collected_at: string | null
+}
+
+export interface TrafficOverviewItem {
+  project_id: string
+  slug: string
+  name: string
+  url: string
+  configured: boolean
+  clicks: TrafficTrend | null
+  impressions: TrafficTrend | null
+  sessions: TrafficTrend | null
+  alert_severity: string | null
+  alert_messages: { severity: string; message: string }[] | null
+  last_collected_at: string | null
+}
+
 export interface ProjectDetail extends Project {
+  traffic_last_collected_at: string | null
   tasks: Task[]
   pipeline_snapshots: PipelineSnapshot[]
   traffic_snapshots: TrafficSnapshot[]
