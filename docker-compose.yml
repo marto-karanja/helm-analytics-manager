@@ -45,5 +45,32 @@ services:
     cpus: 1.0
     logging: *default-logging
 
+  collector:
+    build:
+      context: ./backend
+    command: ["uv", "run", "--no-dev", "python", "-m", "app.collector"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      HELM_GOOGLE_CREDENTIALS_FILE: /run/secrets/google-sa.json
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # The directory, not the single file: Docker creates a *directory* at a missing single-file
+      # bind-mount source, which would make the collector think a key exists. Never mount this into web.
+      - ./secrets:/run/secrets:ro
+    healthcheck:
+      # The venv interpreter, not bare `python`: the dependencies (pydantic-settings, SQLAlchemy) live in /app/.venv.
+      test: ["CMD", "/app/.venv/bin/python", "-m", "app.collector", "--healthcheck"]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 10m
+    mem_limit: 256m
+    cpus: 0.5
+    logging: *default-logging
+
 volumes:
   helm_postgres_data:
