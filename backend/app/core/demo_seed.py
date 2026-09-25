@@ -8,14 +8,17 @@ Idempotent -- safe to re-run (e.g. HELM_DEMO_MODE_SEED=true on a redeploy)
 to refresh stale demo data; it deletes and recreates all is_demo rows.
 """
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.project import PipelineSnapshot, Project, Task, TrafficSnapshot
+from app.collector import alerts as traffic_alerts
+from app.collector.summary import GSC_LAG_DAYS, compute_summary
+from app.models.project import PipelineSnapshot, Project, Task, TrafficDaily, TrafficSnapshot
 
 DEMO_SNAPSHOT_LABEL_DATE = "2026-09-01"
+DEMO_TRAFFIC_DAYS = 90
 
 _DEMO_PORTFOLIO = [
     {
@@ -143,9 +146,30 @@ _DEMO_TASKS = {
 }
 
 
+def _demo_traffic_series(index: int, last_day: date) -> list[dict]:
+    """Synthetic, deterministic numbers (a plain formula, no randomness): a slow upward trend with a weekly wobble."""
+    rows = []
+    for offset in range(DEMO_TRAFFIC_DAYS):
+        clicks = 40 + index * 15 + offset // 2 + (offset % 7) * 3
+        impressions = clicks * (18 + index % 4)
+        rows.append(
+            {
+                "metric_date": last_day - timedelta(days=DEMO_TRAFFIC_DAYS - 1 - offset),
+                "clicks": clicks,
+                "impressions": impressions,
+                "ctr": round(clicks / impressions, 4),
+                "avg_position": round(18 - index * 0.8 - offset * 0.03, 2),
+                "sessions": clicks * 85 // 100,
+                "engaged_sessions": clicks * 60 // 100,
+            }
+        )
+    return rows
+
+
 async def seed_demo_data(session: AsyncSession) -> None:
     await session.execute(delete(Task).where(Task.project_id.in_(select_demo_project_ids())))
     await session.execute(delete(PipelineSnapshot).where(PipelineSnapshot.project_id.in_(select_demo_project_ids())))
+    await session.execute(delete(TrafficDaily).where(TrafficDaily.project_id.in_(select_demo_project_ids())))
     await session.execute(delete(TrafficSnapshot).where(TrafficSnapshot.project_id.in_(select_demo_project_ids())))
     await session.execute(delete(Project).where(Project.is_demo.is_(True)))
     await session.flush()
@@ -153,6 +177,9 @@ async def seed_demo_data(session: AsyncSession) -> None:
     frozen_synced_at = datetime.combine(
         date.fromisoformat(DEMO_SNAPSHOT_LABEL_DATE), datetime.min.time(), tzinfo=timezone.utc
     )
+
+    demo_last_day = date.fromisoformat(DEMO_SNAPSHOT_LABEL_DATE)
+    pipeline_index = 0
 
     for entry in _DEMO_PORTFOLIO:
         project = Project(
@@ -184,7 +211,24 @@ async def seed_demo_data(session: AsyncSession) -> None:
                     alert_messages=[],
                 )
             )
-            session.add(TrafficSnapshot(project_id=project.id, synced_at=frozen_synced_at, configured=False))
+
+            series = _demo_traffic_series(pipeline_index, demo_last_day)
+            pipeline_index += 1
+            session.add_all(TrafficDaily(project_id=project.id, updated_at=frozen_synced_at, **row) for row in series)
+            summary = compute_summary(series, today=demo_last_day + timedelta(days=GSC_LAG_DAYS))
+            alerts = traffic_alerts.evaluate(summary)
+            session.add(
+                TrafficSnapshot(
+                    project_id=project.id,
+                    synced_at=frozen_synced_at,
+                    configured=True,
+                    clicks=summary["clicks"],
+                    impressions=summary["impressions"],
+                    sessions=summary["sessions"],
+                    alert_severity=traffic_alerts.overall_severity(alerts),
+                    alert_messages=alerts,
+                )
+            )
 
         for title, status, priority in _DEMO_TASKS.get(entry["slug"], []):
             session.add(Task(project_id=project.id, title=title, status=status, priority=priority))

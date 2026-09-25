@@ -12,6 +12,8 @@ dependencies = [
     "pydantic-settings>=2.6",
     "fastapi-users[sqlalchemy]>=14.0",
     "python-multipart>=0.0.17",
+    "google-auth>=2.58.1",
+    "requests>=2.34.2",
 ]
 
 [dependency-groups]

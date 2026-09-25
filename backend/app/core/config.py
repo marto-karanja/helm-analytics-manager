@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     demo_mode_seed: bool = False
     allow_registration: bool = False
     access_token_lifetime_seconds: int = 3600 * 24
+    google_credentials_file: str = ""
+    collect_interval_hours: int = 24
+    collect_backfill_days: int = 480
 
 
 settings = Settings()

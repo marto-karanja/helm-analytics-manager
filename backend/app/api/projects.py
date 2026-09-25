@@ -1,13 +1,14 @@
 import uuid
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import case, select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.users import current_active_user
 from app.db.session import get_async_session
-from app.models.project import Project, Task
+from app.models.project import Project, Task, TrafficDaily, TrafficSnapshot
 from app.models.user import User
 from app.schemas.project import (
     ProjectDetailRead,
@@ -17,6 +18,8 @@ from app.schemas.project import (
     TaskRead,
     TaskUpdate,
     TaskWithProjectRead,
+    TrafficOverviewItem,
+    TrafficRead,
 )
 
 router = APIRouter(dependencies=[Depends(current_active_user)])
@@ -91,7 +94,84 @@ async def get_project(
     project.open_task_count = sum(1 for t in project.tasks if t.status != "done")
     project.pipeline_snapshots = project.pipeline_snapshots[:SNAPSHOT_HISTORY_LIMIT]
     project.traffic_snapshots = project.traffic_snapshots[:SNAPSHOT_HISTORY_LIMIT]
+    project.traffic_last_collected_at = await _last_collected_at(session, project.id)
     return project
+
+
+async def _last_collected_at(session: AsyncSession, project_id: uuid.UUID) -> datetime | None:
+    # From the data rows, not TrafficSnapshot.synced_at: a run whose pull failed still writes a
+    # snapshot, and that must not make stale data look freshly collected.
+    return (
+        await session.execute(select(func.max(TrafficDaily.updated_at)).where(TrafficDaily.project_id == project_id))
+    ).scalar_one()
+
+
+@router.get("/projects/{project_id}/traffic", response_model=TrafficRead)
+async def get_project_traffic(
+    project_id: uuid.UUID,
+    days: int = Query(90, ge=1, le=500),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> dict:
+    project = (
+        await session.execute(select(Project.id).where(Project.id == project_id, Project.is_demo == user.is_demo))
+    ).first()
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    newest = (
+        await session.execute(select(func.max(TrafficDaily.metric_date)).where(TrafficDaily.project_id == project_id))
+    ).scalar_one()
+    rows: list[TrafficDaily] = []
+    if newest is not None:
+        # Anchored on the newest stored day (not today) so the window is stable, and calendar-based so
+        # days the source skipped stay gaps in the chart instead of pulling in older rows.
+        result = await session.execute(
+            select(TrafficDaily)
+            .where(TrafficDaily.project_id == project_id, TrafficDaily.metric_date > newest - timedelta(days=days))
+            .order_by(TrafficDaily.metric_date)
+        )
+        rows = list(result.scalars().all())
+    return {"days": rows, "last_collected_at": await _last_collected_at(session, project_id)}
+
+
+@router.get("/traffic/overview", response_model=list[TrafficOverviewItem])
+async def traffic_overview(
+    user: User = Depends(current_active_user), session: AsyncSession = Depends(get_async_session)
+) -> list[dict]:
+    result = await session.execute(
+        select(Project)
+        .where(Project.is_demo == user.is_demo, Project.is_pipeline.is_(True))
+        .order_by(Project.name)
+        .options(selectinload(Project.traffic_snapshots))
+    )
+    projects = list(result.scalars().all())
+    collected = dict(
+        (
+            await session.execute(
+                select(TrafficDaily.project_id, func.max(TrafficDaily.updated_at)).group_by(TrafficDaily.project_id)
+            )
+        ).all()
+    )
+    items = []
+    for project in projects:
+        latest: TrafficSnapshot | None = project.traffic_snapshots[0] if project.traffic_snapshots else None
+        items.append(
+            {
+                "project_id": project.id,
+                "slug": project.slug,
+                "name": project.name,
+                "url": project.url,
+                "configured": bool(project.gsc_site_url or project.ga4_property_id) or bool(latest and latest.configured),
+                "clicks": latest.clicks if latest else None,
+                "impressions": latest.impressions if latest else None,
+                "sessions": latest.sessions if latest else None,
+                "alert_severity": latest.alert_severity if latest else None,
+                "alert_messages": latest.alert_messages if latest else None,
+                "last_collected_at": collected.get(project.id),
+            }
+        )
+    return items
 
 
 @router.patch("/projects/{project_id}", response_model=ProjectRead)

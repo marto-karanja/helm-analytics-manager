@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -80,7 +80,7 @@ class PipelineSnapshot(Base):
 
 
 class TrafficSnapshot(Base):
-    """One row per sync_to_hub.py run, from seo_dashboard.search_metrics.compute_search_metrics()."""
+    """One row per collector run per project: the latest 7-day vs prior-7-day summary plus alerts."""
 
     __tablename__ = "traffic_snapshots"
 
@@ -93,11 +93,45 @@ class TrafficSnapshot(Base):
     impressions: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     sessions: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
-    # from search_alerts.evaluate_search()
     alert_severity: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    alert_messages: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    alert_messages: Mapped[list | None] = mapped_column(JSONB, nullable=True)
 
     project: Mapped["Project"] = relationship(back_populates="traffic_snapshots")
+
+
+class TrafficDaily(Base):
+    """One row per project per day; GSC and GA4 columns are filled independently by the collector."""
+
+    __tablename__ = "traffic_daily"
+    __table_args__ = (UniqueConstraint("project_id", "metric_date", name="uq_traffic_daily_project_date"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    metric_date: Mapped[date] = mapped_column(Date)
+
+    clicks: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    impressions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ctr: Mapped[float | None] = mapped_column(Float, nullable=True)
+    avg_position: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sessions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    engaged_sessions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CollectorRun(Base):
+    """Audit row written by every collector pass; also what the container healthcheck reads."""
+
+    __tablename__ = "collector_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(20))  # ok | partial | error | skipped
+    detail: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    rows_upserted: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class Task(Base):

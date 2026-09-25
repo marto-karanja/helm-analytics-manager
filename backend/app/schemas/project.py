@@ -93,7 +93,39 @@ class TrafficSnapshotRead(BaseModel):
     alert_messages: list | None
 
 
+class TrafficDayRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    metric_date: date
+    clicks: int | None
+    impressions: int | None
+    ctr: float | None
+    avg_position: float | None
+    sessions: int | None
+    engaged_sessions: int | None
+
+
+class TrafficRead(BaseModel):
+    days: list[TrafficDayRead]
+    last_collected_at: datetime | None
+
+
+class TrafficOverviewItem(BaseModel):
+    project_id: uuid.UUID
+    slug: str
+    name: str
+    url: str
+    configured: bool
+    clicks: dict | None
+    impressions: dict | None
+    sessions: dict | None
+    alert_severity: str | None
+    alert_messages: list | None
+    last_collected_at: datetime | None
+
+
 class ProjectDetailRead(ProjectRead):
+    traffic_last_collected_at: datetime | None = None
     tasks: list[TaskRead]
     pipeline_snapshots: list[PipelineSnapshotRead]
     traffic_snapshots: list[TrafficSnapshotRead]
