@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import verify_sync_token
 from app.db.session import get_async_session
-from app.models.project import PipelineSnapshot, Project, TrafficSnapshot
+from app.models.project import PipelineSnapshot, Project
 from app.schemas.sync import PipelineSyncItem, PortfolioSyncItem, SyncPayload
 
 router = APIRouter(dependencies=[Depends(verify_sync_token)])
@@ -60,17 +60,15 @@ async def _upsert_pipeline_project(session: AsyncSession, item: PipelineSyncItem
             category="seo-content-site",
             url=item.url,
             is_pipeline=True,
-            gsc_site_url=item.gsc_site_url,
-            ga4_property_id=item.ga4_property_id,
         )
         session.add(project)
         await session.flush()
         return project, True
 
+    # gsc_site_url / ga4_property_id are owned by Helm's database (set via the
+    # CLI and read by the collector) -- the sync must never touch them.
     project.is_pipeline = True
     project.url = item.url
-    project.gsc_site_url = item.gsc_site_url
-    project.ga4_property_id = item.ga4_property_id
     return project, False
 
 
@@ -106,17 +104,6 @@ async def receive_sync(
                 last_7_runs=item.metrics.last_7_runs,
                 alert_severity=item.pipeline_alert_severity,
                 alert_messages=item.pipeline_alert_messages,
-            )
-        )
-        session.add(
-            TrafficSnapshot(
-                project_id=project.id,
-                configured=item.traffic.configured,
-                clicks=item.traffic.clicks,
-                impressions=item.traffic.impressions,
-                sessions=item.traffic.sessions,
-                alert_severity=item.traffic_alert_severity,
-                alert_messages=item.traffic_alert_messages,
             )
         )
 

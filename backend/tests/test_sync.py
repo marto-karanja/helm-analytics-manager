@@ -79,15 +79,12 @@ def _pipeline_item(**overrides):
         },
         "pipeline_alert_severity": "green",
         "pipeline_alert_messages": [],
-        "traffic": {"configured": False},
-        "traffic_alert_severity": "green",
-        "traffic_alert_messages": [],
     }
     item.update(overrides)
     return item
 
 
-async def test_sync_creates_pipeline_project_with_snapshots(client):
+async def test_sync_creates_pipeline_project_with_pipeline_snapshot_only(client):
     headers = {"Authorization": f"Bearer {settings.sync_token}"}
     resp = await client.post("/api/sync", json={"pipelines": [_pipeline_item()]}, headers=headers)
     assert resp.status_code == 202
@@ -109,8 +106,7 @@ async def test_sync_creates_pipeline_project_with_snapshots(client):
         traffic_result = await session.execute(
             select(TrafficSnapshot).where(TrafficSnapshot.project_id == project.id)
         )
-        traffic = traffic_result.scalar_one()
-        assert traffic.configured is False
+        assert traffic_result.scalars().all() == []
 
 
 async def test_sync_unifies_pipeline_and_portfolio_by_slug(client):
@@ -140,3 +136,52 @@ async def test_sync_unifies_pipeline_and_portfolio_by_slug(client):
         project = matches[0]
         assert project.is_pipeline is True
         assert project.goals == "Grow traffic"
+
+
+async def test_sync_leaves_analytics_identifiers_untouched(client):
+    headers = {"Authorization": f"Bearer {settings.sync_token}"}
+    await client.post("/api/sync", json={"pipelines": [_pipeline_item(slug="ids-project")]}, headers=headers)
+
+    async with async_session_maker() as session:
+        project = (await session.execute(select(Project).where(Project.slug == "ids-project"))).scalar_one()
+        project.gsc_site_url = "sc-domain:example.com"
+        project.ga4_property_id = "properties/123"
+        await session.commit()
+
+    resp = await client.post("/api/sync", json={"pipelines": [_pipeline_item(slug="ids-project")]}, headers=headers)
+    assert resp.status_code == 202
+
+    async with async_session_maker() as session:
+        project = (await session.execute(select(Project).where(Project.slug == "ids-project"))).scalar_one()
+        assert project.gsc_site_url == "sc-domain:example.com"
+        assert project.ga4_property_id == "properties/123"
+
+
+async def test_sync_ignores_identifiers_sent_by_older_clients(client):
+    headers = {"Authorization": f"Bearer {settings.sync_token}"}
+    item = _pipeline_item(slug="legacy-ids", gsc_site_url="https://old.example.com/", ga4_property_id="properties/9")
+    await client.post("/api/sync", json={"pipelines": [item]}, headers=headers)
+
+    async with async_session_maker() as session:
+        project = (await session.execute(select(Project).where(Project.slug == "legacy-ids"))).scalar_one()
+        assert project.gsc_site_url is None
+        assert project.ga4_property_id is None
+
+
+async def test_sync_accepts_legacy_traffic_keys(client):
+    headers = {"Authorization": f"Bearer {settings.sync_token}"}
+    item = _pipeline_item(
+        slug="legacy-traffic",
+        traffic={"configured": True, "clicks": {"recent": 1, "prior": 2, "pct_change": -50.0}},
+        traffic_alert_severity="yellow",
+        traffic_alert_messages=[{"severity": "yellow", "message": "old"}],
+    )
+    resp = await client.post("/api/sync", json={"pipelines": [item]}, headers=headers)
+    assert resp.status_code == 202
+
+    async with async_session_maker() as session:
+        project = (await session.execute(select(Project).where(Project.slug == "legacy-traffic"))).scalar_one()
+        traffic = (
+            await session.execute(select(TrafficSnapshot).where(TrafficSnapshot.project_id == project.id))
+        ).scalars().all()
+        assert traffic == []

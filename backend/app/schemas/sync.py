@@ -24,25 +24,15 @@ class PipelineMetrics(BaseModel):
     last_7_runs: list[dict] = []
 
 
-class TrafficPayload(BaseModel):
-    configured: bool = False
-    clicks: dict | None = None
-    impressions: dict | None = None
-    sessions: dict | None = None
-
-
 class PipelineSyncItem(BaseModel):
+    # Older sync_to_hub.py versions also send traffic*, gsc_site_url and
+    # ga4_property_id; pydantic ignores unknown fields, so they are dropped.
     slug: str
     name: str
     url: str
     metrics: PipelineMetrics
     pipeline_alert_severity: str
     pipeline_alert_messages: list[dict] = []
-    traffic: TrafficPayload
-    traffic_alert_severity: str
-    traffic_alert_messages: list[dict] = []
-    gsc_site_url: str | None = None
-    ga4_property_id: str | None = None
 
 
 class SyncPayload(BaseModel):
