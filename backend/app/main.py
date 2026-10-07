@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, projects, sync
+from app.api import auth, indexing, keywords, projects, reports, sync
 from app.core.config import settings
 from app.core.demo_seed import seed_demo_data
 from app.db.session import async_session_maker
@@ -30,6 +30,9 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api")
 app.include_router(projects.router, prefix="/api", tags=["projects"])
 app.include_router(sync.router, prefix="/api", tags=["sync"])
+app.include_router(indexing.router, prefix="/api", tags=["indexing"])
+app.include_router(keywords.router, prefix="/api", tags=["keywords"])
+app.include_router(reports.router, prefix="/api", tags=["reports"])
 
 
 @app.get("/api/health")
