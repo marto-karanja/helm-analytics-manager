@@ -43,6 +43,7 @@ def test_clicks_message():
 def test_zero_impressions_is_red():
     (alert,) = evaluate(_summary(impressions=_trend(0, 500)))
     assert alert == {
+        "kind": "zero_impressions",
         "severity": "red",
         "message": "Zero search impressions in the last 7 days (possible deindexing)",
     }
@@ -101,3 +102,24 @@ def test_pull_failed_alert_truncates_error():
 )
 def test_overall_severity(severities, expected):
     assert overall_severity([{"severity": s, "message": ""} for s in severities]) == expected
+
+
+def test_configured_project_with_no_rows_is_no_data_not_green():
+    (alert,) = evaluate(_summary())
+    assert alert["kind"] == "no_data" and alert["severity"] == "yellow"
+    assert overall_severity([alert]) == "yellow"
+
+
+def test_dormant_project_with_no_rows_does_not_alert():
+    assert evaluate(_summary(), expect_data=False) == []
+
+
+def test_any_data_at_all_means_not_no_data():
+    assert evaluate(_summary(sessions=_trend(5, 5))) == []
+
+
+def test_every_alert_has_a_kind():
+    alerts = evaluate(
+        _summary(clicks=_trend(10, 100), impressions=_trend(0, 500), sessions=_trend(0, 5), position=(20.0, 5.0))
+    ) + [pull_failed_alert("x")]
+    assert {a["kind"] for a in alerts} == {"clicks_drop", "zero_impressions", "sessions_zero_clicks_nonzero", "position_worse", "pull_failed"}
