@@ -74,7 +74,7 @@ async def test_loop_once_records_a_skipped_run_without_credentials(monkeypatch):
     await _clear_runs()
     await collector_main.loop(backfill_days=None, once=True)
     async with async_session_maker() as session:
-        runs = (await session.execute(CollectorRun.__table__.select())).all()
+        runs = (await session.execute(CollectorRun.__table__.select().where(CollectorRun.kind == "traffic"))).all()
     assert [r.status for r in runs] == ["skipped"]
 
 
@@ -86,7 +86,7 @@ async def test_loop_survives_and_records_an_unexpected_exception(monkeypatch):
     await _clear_runs()
     await collector_main.loop(backfill_days=None, once=True)  # must not raise
     async with async_session_maker() as session:
-        (run,) = (await session.execute(CollectorRun.__table__.select())).all()
+        (run,) = (await session.execute(CollectorRun.__table__.select().where(CollectorRun.kind == "traffic"))).all()
     assert run.status == "error"
     assert "kaboom" in run.detail["error"]
 
@@ -103,6 +103,7 @@ async def test_loop_keeps_going_after_a_failed_iteration(monkeypatch):
     async def no_sleep(seconds):
         return None
 
+    monkeypatch.setattr(settings, "collect_interval_hours", 0)  # traffic is due on every pass
     monkeypatch.setattr(collector_main, "run_once", flaky)
     monkeypatch.setattr(collector_main.asyncio, "sleep", no_sleep)
     with pytest.raises(SystemExit):
