@@ -59,6 +59,12 @@ def _budget_split(value: Any) -> dict[str, int]:
     return {str(slug): check(n) for slug, n in value.items()}
 
 
+def _slug_list(value: Any) -> list[str]:
+    if not isinstance(value, list) or not all(isinstance(s, str) and s.strip() for s in value):
+        raise SettingError("must be a list of project slugs")
+    return sorted({s.strip() for s in value})
+
+
 @dataclass(frozen=True)
 class SettingSpec:
     default: Any
@@ -71,6 +77,9 @@ SPECS: dict[str, SettingSpec] = {
         500, _int_between(0, INSPECTION_CEILING), "URL inspections per day across all projects (hard ceiling 1,500)"
     ),
     "inspection_budget_split": SettingSpec({}, _budget_split, "Optional per-project daily cap, keyed by slug"),
+    "expected_no_data": SettingSpec(
+        [], _slug_list, "Project slugs that are dormant: having no traffic data is expected and does not alert"
+    ),
     "thin_word_threshold": SettingSpec(300, _int_between(50, 5000), "Pages below this word count are flagged thin"),
     "scoring_weights": SettingSpec(
         {"demand": 1.0, "gap": 1.2, "relevance": 0.6, "competition": 0.3}, _weights, "Keyword score weights"

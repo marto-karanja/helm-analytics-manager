@@ -56,6 +56,18 @@ def _run_set_analytics(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_send_test_notification() -> int:
+    from app.notify import Notification, build_notifiers, notify
+
+    notifiers = build_notifiers()
+    if not notifiers:
+        print("No channel configured (set HELM_SMTP_* plus HELM_REPORT_RECIPIENTS, and/or HELM_TELEGRAM_*).", file=sys.stderr)
+        return 1
+    sent = asyncio.run(notify(notifiers, Notification("opened", "helm-test", "test", "yellow", "Test notification from Helm")))
+    print(f"Sent via {sent} of {len(notifiers)} channel(s): {', '.join(n.name for n in notifiers)}")
+    return 0 if sent == len(notifiers) else 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -65,8 +77,11 @@ def main() -> int:
     analytics.add_argument("slug")
     analytics.add_argument("--gsc", help="Search Console property, e.g. sc-domain:example.com or https://example.com/")
     analytics.add_argument("--ga4", help="GA4 property, e.g. properties/123456789")
+    sub.add_parser("send-test-notification", help="send one test alert through every configured channel")
     args = parser.parse_args()
 
+    if args.command == "send-test-notification":
+        return _run_send_test_notification()
     if args.command == "set-analytics":
         return _run_set_analytics(args)
 

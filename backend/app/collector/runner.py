@@ -6,13 +6,16 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.alerts.events import apply_alerts
 from app.collector import alerts as alert_rules
 from app.collector.ga4 import fetch_ga4_daily
 from app.collector.gsc import fetch_gsc_daily
 from app.collector.store import upsert_traffic_daily
 from app.collector.summary import GSC_LAG_DAYS, WINDOW_DAYS, compute_summary
+from app.core.app_settings import get_setting
 from app.core.config import settings
 from app.db.session import async_session_maker
+from app.notify import build_notifiers
 from app.models.project import CollectorRun, Project, TrafficDaily, TrafficSnapshot
 
 logger = logging.getLogger("helm.collector")
@@ -44,8 +47,9 @@ async def _load_summary(db: AsyncSession, project_id, today: date) -> dict:
 
 
 async def _collect_project(
-    db: AsyncSession, project: Project, http_session, today: date, backfill_days: int | None
+    db: AsyncSession, project: Project, http_session, today: date, backfill_days: int | None, notifiers: list | None = None
 ) -> dict:
+    notifiers = notifiers or []
     """Pulls each configured source; a failing source is recorded but does not lose the other's rows."""
     has_rows = (
         await db.execute(select(TrafficDaily.id).where(TrafficDaily.project_id == project.id).limit(1))
@@ -81,7 +85,9 @@ async def _collect_project(
     # Summarised from stored rows even after a failure, so the UI keeps showing the last known trend
     # next to the "pull failed" alert instead of going blank.
     summary = await _load_summary(db, project.id, today)
-    alerts = alert_rules.evaluate(summary) + [alert_rules.pull_failed_alert(e) for e in errors]
+    # A failed pull already explains missing rows, so it is reported once, as "pull failed", not also as "no data".
+    expect_data = project.slug not in await get_setting(db, "expected_no_data") and not errors
+    alerts = alert_rules.evaluate(summary, expect_data) + [alert_rules.pull_failed_alert(e) for e in errors]
     db.add(
         TrafficSnapshot(
             project_id=project.id,
@@ -94,6 +100,11 @@ async def _collect_project(
         )
     )
     await db.commit()
+    try:
+        await apply_alerts(db, project, alerts, notifiers, min_interval=timedelta(hours=settings.alert_min_notify_hours))
+    except Exception:  # noqa: BLE001 -- alert bookkeeping must never fail the collection itself
+        await db.rollback()
+        logger.exception("Alert event processing failed for %s", project.slug)
     return {"status": "error" if errors else "ok", "rows": rows_upserted, "days": days, "errors": errors}
 
 
@@ -119,6 +130,7 @@ async def run_once(
     http_session=None,
     today: date | None = None,
     backfill_days: int | None = None,
+    notifiers: list | None = None,
 ) -> CollectorRun:
     """One collection pass. `http_session=None` means no credentials: nothing is pulled and the run is `skipped`."""
     started_at = datetime.now(timezone.utc)
@@ -140,11 +152,13 @@ async def run_once(
         logger.info("No projects have gsc_site_url or ga4_property_id set; nothing to collect (skipped)")
         return await _record_run(session_factory, started_at, "skipped", {"reason": "no configured projects"}, 0)
 
+    if notifiers is None:
+        notifiers = build_notifiers()
     detail: dict[str, dict] = {}
     for project in projects:
         try:
             async with session_factory() as db:
-                detail[project.slug] = await _collect_project(db, project, http_session, today, backfill_days)
+                detail[project.slug] = await _collect_project(db, project, http_session, today, backfill_days, notifiers)
         except Exception as exc:  # noqa: BLE001 -- e.g. the database failing for this one project
             logger.exception("Collection failed for %s", project.slug)
             detail[project.slug] = {"status": "error", "rows": 0, "errors": [_error_text(exc)]}
