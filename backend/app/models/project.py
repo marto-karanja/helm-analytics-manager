@@ -129,6 +129,8 @@ class CollectorRun(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Which job wrote the row: traffic | sitemap_walk | page_signals | url_inspection | gsc_query_rollup
+    kind: Mapped[str] = mapped_column(String(30), default="traffic", server_default="traffic", index=True)
     status: Mapped[str] = mapped_column(String(20))  # ok | partial | error | skipped
     detail: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     rows_upserted: Mapped[int] = mapped_column(Integer, default=0)
