@@ -29,6 +29,7 @@ async def _ensure_test_database_exists() -> None:
 
 asyncio.run(_ensure_test_database_exists())
 
+import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 
@@ -80,3 +81,15 @@ async def seeded_project():
         await session.commit()
         await session.refresh(project)
         return project
+
+
+@pytest.fixture(autouse=True)
+def no_real_network(monkeypatch):
+    """Indexing jobs fetch live pages; no test may reach the network by accident."""
+    from app.indexing import jobs, signals
+
+    def refuse(*args, **kwargs):
+        raise RuntimeError("real network access in a test")
+
+    monkeypatch.setattr(jobs, "http_fetch", refuse)
+    monkeypatch.setattr(signals, "fetch_page", refuse)

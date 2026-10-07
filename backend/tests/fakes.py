@@ -20,7 +20,12 @@ class FakeSession:
     def __init__(self, respond=None):
         self.respond = respond or (lambda url, body: FakeResponse())
         self.calls: list[dict] = []
+        self.get_responses: dict[str, "FakeResponse"] = {}
 
     def post(self, url: str, json: dict | None = None, **kwargs) -> FakeResponse:
         self.calls.append({"url": url, "json": json, "kwargs": kwargs})
         return self.respond(url, json)
+
+    def get(self, url: str, **kwargs) -> FakeResponse:
+        self.calls.append({"url": url, "json": None, "kwargs": kwargs, "method": "GET"})
+        return self.get_responses.get(url, FakeResponse())

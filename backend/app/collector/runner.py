@@ -97,8 +97,11 @@ async def _collect_project(
     return {"status": "error" if errors else "ok", "rows": rows_upserted, "days": days, "errors": errors}
 
 
-async def _record_run(session_factory: Callable, started_at: datetime, status: str, detail: dict, rows: int) -> CollectorRun:
+async def _record_run(
+    session_factory: Callable, started_at: datetime, status: str, detail: dict, rows: int, kind: str = "traffic"
+) -> CollectorRun:
     run = CollectorRun(
+        kind=kind,
         started_at=started_at,
         finished_at=datetime.now(timezone.utc),
         status=status,
