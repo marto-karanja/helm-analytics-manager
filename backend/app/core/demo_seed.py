@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.collector import alerts as traffic_alerts
 from app.collector.summary import GSC_LAG_DAYS, compute_summary
+from app.core.demo_seed_indexing import seed_project_indexing
 from app.models.project import PipelineSnapshot, Project, Task, TrafficDaily, TrafficSnapshot
 
 DEMO_SNAPSHOT_LABEL_DATE = "2026-09-01"
@@ -191,6 +192,9 @@ async def seed_demo_data(session: AsyncSession) -> None:
             is_demo=True,
             goals=entry.get("goals"),
             current_status=entry.get("current_status"),
+            # Demo projects are never collected (the collector skips is_demo); the identifier only lets the UI show
+            # their frozen indexing data as Search Console backed.
+            gsc_site_url=entry["url"].rstrip("/") + "/" if entry["is_pipeline"] else None,
         )
         session.add(project)
         await session.flush()
@@ -212,6 +216,7 @@ async def seed_demo_data(session: AsyncSession) -> None:
                 )
             )
 
+            await seed_project_indexing(session, project, pipeline_index, demo_last_day)
             series = _demo_traffic_series(pipeline_index, demo_last_day)
             pipeline_index += 1
             session.add_all(TrafficDaily(project_id=project.id, updated_at=frozen_synced_at, **row) for row in series)

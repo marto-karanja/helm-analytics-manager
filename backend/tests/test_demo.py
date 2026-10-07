@@ -40,3 +40,32 @@ async def test_demo_account_is_read_only_and_scoped(client, seeded_project):
         f"/api/projects/{demo_project_id}/tasks", json={"title": "x"}, headers=headers
     )
     assert task_resp.status_code == 403
+
+
+async def test_demo_seed_includes_indexing_keywords_and_reports_and_is_idempotent(client):
+    async with async_session_maker() as session:
+        await seed_demo_data(session)
+        await seed_demo_data(session)  # a redeploy re-seeds: must replace, not duplicate
+
+    token = (await client.post("/api/auth/demo-login")).json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    projects = (await client.get("/api/projects", headers=headers)).json()
+    pipeline = next(p for p in projects if p["slug"] == "demo-nairobistalls")
+
+    summary = (await client.get(f"/api/projects/{pipeline['id']}/indexing", headers=headers)).json()
+    assert summary["total"] == 24
+    assert summary["counts"]["indexed"] == 16 and summary["counts"]["thin"] == 2 and summary["counts"]["blocked"] == 1
+    assert summary["counts"]["crawled_not_indexed"] == 3 and summary["counts"]["discovered_not_indexed"] == 2
+    assert len(summary["history"]) == 12
+
+    keywords = (await client.get(f"/api/projects/{pipeline['id']}/keywords", headers=headers)).json()
+    assert keywords["counts"] == {"proposed": 4, "accepted": 2, "rejected": 2, "written": 0}
+    assert (await client.get(f"/api/projects/{pipeline['id']}/keywords/striking-distance", headers=headers)).json()
+
+    sitemaps = (await client.get(f"/api/projects/{pipeline['id']}/sitemaps", headers=headers)).json()
+    assert sitemaps["sitemaps"][0]["submitted_urls"] == 24
+
+    report = (await client.get("/api/reports/indexing", headers=headers)).json()
+    assert len(report["rows"]) == 8 and all(row[1] == 24 for row in report["rows"])
+    assert (await client.get("/api/reports/digest", headers=headers)).json()["rows"]
+    assert (await client.get("/api/reports/non-indexed?format=csv", headers=headers)).text.count("\r\n") > 8
