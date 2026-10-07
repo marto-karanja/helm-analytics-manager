@@ -33,6 +33,16 @@ class Settings(BaseSettings):
     google_ads_api_version: str = "v21"
     # Host headers the MCP server accepts (DNS-rebinding protection); `:*` allows any port.
     mcp_allowed_hosts: list[str] = ["mcp.billtoolbox.com", "localhost:*", "127.0.0.1:*"]
+    # Notifications. Both channels are optional; with none configured, alert events are still recorded.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    report_recipients: str = ""  # comma-separated; the only addresses Helm ever mails
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    alert_min_notify_hours: int = 6
     # Seconds between scheduler wake-ups; each job still runs on its own interval.
     scheduler_tick_seconds: int = 60
 
