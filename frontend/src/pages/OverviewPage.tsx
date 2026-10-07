@@ -3,15 +3,22 @@ import { Link } from 'react-router-dom'
 import { SeverityBadge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { fetchProjects, fetchTrafficOverview } from '@/lib/api'
+import { fetchIndexingOverview } from '@/lib/indexingApi'
+import type { IndexingOverviewItem } from '@/lib/indexingTypes'
 import { formatNumber, formatPct } from '@/lib/traffic'
 import type { Project, TrafficOverviewItem } from '@/lib/types'
 
 export function OverviewPage() {
   const [projects, setProjects] = React.useState<Project[] | null>(null)
   const [traffic, setTraffic] = React.useState<Record<string, TrafficOverviewItem>>({})
+  const [indexing, setIndexing] = React.useState<Record<string, IndexingOverviewItem>>({})
   const [error, setError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
+    // Also a bonus on the cards.
+    fetchIndexingOverview()
+      .then((items) => setIndexing(Object.fromEntries(items.map((i) => [i.project_id, i]))))
+      .catch(() => undefined)
     fetchProjects()
       .then(setProjects)
       .catch(() => setError('Failed to load projects.'))
@@ -43,10 +50,31 @@ export function OverviewPage() {
               </span>
             </CardContent>
             {project.is_pipeline && <TrafficLine item={traffic[project.id]} />}
+            {project.is_pipeline && <IndexingLine item={indexing[project.id]} />}
           </Card>
         </Link>
       ))}
     </div>
+  )
+}
+
+function IndexingLine({ item }: { item: IndexingOverviewItem | undefined }) {
+  if (!item || item.total_urls === 0) return null
+  const problems = item.thin + item.crawled_not_indexed
+  return (
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pb-4 text-xs text-muted-foreground">
+      <span>
+        Indexed: <span className="font-medium text-foreground">{item.indexed_percent === null ? '—' : `${item.indexed_percent}%`}</span>
+      </span>
+      <span title="Thin pages plus pages Google crawled but did not index">
+        Needs work: <span className={problems > 0 ? 'font-medium text-foreground' : 'font-medium'}>{problems}</span>
+      </span>
+      {item.pending_keywords > 0 && (
+        <span>
+          Keywords to review: <span className="font-medium text-foreground">{item.pending_keywords}</span>
+        </span>
+      )}
+    </p>
   )
 }
 

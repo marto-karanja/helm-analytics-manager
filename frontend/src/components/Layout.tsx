@@ -1,4 +1,4 @@
-import { LayoutGrid, LineChart, ListChecks, LogOut } from 'lucide-react'
+import { FileText, LayoutGrid, LineChart, ListChecks, LogOut, Settings } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Badge } from '@/components/ui/badge'
@@ -22,7 +22,7 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:px-4">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-3 py-3 sm:px-4">
           <span className="flex items-center gap-2 text-sm font-semibold">
             Helm Analytics Manager
             {isDemo && <Badge variant="outline">Demo mode — read-only</Badge>}
@@ -36,6 +36,12 @@ export function Layout() {
             </NavLink>
             <NavLink to="/tasks" title="Tasks" aria-label="Tasks" className={navLinkClass}>
               <ListChecks size={16} /> <span className="hidden sm:inline">Tasks</span>
+            </NavLink>
+            <NavLink to="/reports" title="Reports" aria-label="Reports" className={navLinkClass}>
+              <FileText size={16} /> <span className="hidden sm:inline">Reports</span>
+            </NavLink>
+            <NavLink to="/settings" title="Settings" aria-label="Settings" className={navLinkClass}>
+              <Settings size={16} /> <span className="hidden sm:inline">Settings</span>
             </NavLink>
             <ThemeToggle className="mx-1" />
             <Button variant="ghost" size="sm" aria-label="Log out" onClick={handleLogout}>

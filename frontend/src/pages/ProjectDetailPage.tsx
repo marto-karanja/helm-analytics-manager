@@ -1,7 +1,10 @@
 import * as React from 'react'
 import { ArrowLeft } from 'lucide-react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { BacklogChart } from '@/components/BacklogChart'
+import { IndexingSection } from '@/components/IndexingSection'
+import { KeywordsSection } from '@/components/KeywordsSection'
+import { SitemapsSection } from '@/components/SitemapsSection'
 import { TaskBoard } from '@/components/TaskBoard'
 import { TrafficSection } from '@/components/TrafficSection'
 import { SeverityBadge } from '@/components/ui/badge'
@@ -19,8 +22,19 @@ const EDITABLE_FIELDS = [
   { key: 'priority_notes', label: 'Priority notes' },
 ] as const
 
+const TABS = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'indexing', label: 'Indexing' },
+  { key: 'keywords', label: 'Keywords' },
+  { key: 'sitemaps', label: 'Sitemaps' },
+] as const
+type TabKey = (typeof TABS)[number]['key']
+
 export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedTab = searchParams.get('tab')
+  const requestedKey: TabKey = TABS.some((t) => t.key === requestedTab) ? (requestedTab as TabKey) : 'overview'
   const [project, setProject] = React.useState<ProjectDetail | null>(null)
   const [drafts, setDrafts] = React.useState<Record<string, string>>({})
   const [saving, setSaving] = React.useState<string | null>(null)
@@ -57,6 +71,7 @@ export function ProjectDetailPage() {
   }
 
   if (!project) return <p className="text-sm text-muted-foreground">Loading…</p>
+  const tab: TabKey = project.is_pipeline ? requestedKey : 'overview'
 
   return (
     <div className="flex flex-col gap-6">
@@ -73,6 +88,29 @@ export function ProjectDetailPage() {
         {project.is_pipeline && <SeverityBadge severity={project.latest_alert_severity} />}
       </div>
 
+      {project.is_pipeline && (
+        <nav className="flex gap-1 border-b border-border" aria-label="Project sections">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              aria-current={tab === t.key ? 'page' : undefined}
+              onClick={() => setSearchParams(t.key === 'overview' ? {} : { tab: t.key }, { replace: true })}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                tab === t.key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      {tab === 'indexing' && <IndexingSection projectId={project.id} isDemo={isDemo} />}
+      {tab === 'keywords' && <KeywordsSection projectId={project.id} isDemo={isDemo} />}
+      {tab === 'sitemaps' && <SitemapsSection projectId={project.id} />}
+
+      {tab === 'overview' && (<>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {EDITABLE_FIELDS.map(({ key, label }) => (
           <Card key={key}>
@@ -131,6 +169,7 @@ export function ProjectDetailPage() {
           />
         </CardContent>
       </Card>
+      </>)}
     </div>
   )
 }
