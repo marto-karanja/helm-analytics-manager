@@ -206,6 +206,20 @@ Accepted keywords are exported to `HELM_KEYWORD_EXPORT_DIR/<slug>/keyword_queue.
 services share a volume at `/data/keyword-queues`). Helm cannot write into the sites' own directories, so
 pipelines should pull the queue instead: `GET /api/keyword-queue/<slug>` with a read-scope token as the Bearer.
 
+### Page rankings and the manual check
+
+`gsc_query_rollups` keeps weekly clicks, impressions and average position per (query, page). `get_page_rankings`
+(MCP) and `GET /api/v1/projects/<slug>/rankings` (REST, same bearer tokens) turn that into one row per page: the
+impression-weighted position over the last N weeks, the change against the previous N weeks (positive means the
+page moved up), top queries and indexing state. The weekly job is the default; **Refresh now** on the project's
+Rankings tab, `POST /api/v1/projects/<slug>/rankings/refresh` and the `refresh_rankings` tool queue an on-demand
+pull instead. The collector runs it within about a minute; the limit is one per project every 30 minutes.
+
+### REST API for other projects
+
+`/api/v1/...` takes the same bearer tokens as MCP, with the same per-project scoping, rate limit and audit log.
+It is served by the `web` container, so it needs no tunnel entry beyond the one Helm already has.
+
 ### MCP server
 
 `mcp` serves `https://mcp.billtoolbox.com/mcp` once the Cloudflare tunnel routes it to `127.0.0.1:8020`
@@ -216,9 +230,11 @@ claude mcp add --transport http helm https://mcp.billtoolbox.com/mcp --header "A
 ```
 
 - Read tools: `list_projects`, `get_traffic`, `get_indexing_summary`, `list_urls`, `get_url_history`,
-  `list_keyword_candidates`, `get_sitemap_status`, `get_keyword_run_status`.
-- Write tools (write-scope tokens only): `inspect_url`, `run_keyword_generator`, `set_candidate_status`,
-  `export_keyword_queue`.
+  `get_page_rankings`, `get_alerts`, `list_keyword_candidates`, `get_sitemap_status`, `get_keyword_run_status`.
+- Write tools (write-scope tokens only): `inspect_url`, `refresh_rankings`, `run_keyword_generator`,
+  `set_candidate_status`, `export_keyword_queue`.
+- A token can be limited to named projects (`project_slugs`). A project outside the list answers exactly like one
+  that does not exist.
 - 60 calls a minute per token. Every call is logged to `mcp_calls` (token label, tool, a hash of the arguments, status).
 - Tools return data only: never credentials, key-file contents or raw table dumps. `HELM_SYNC_TOKEN` is not accepted.
 - Demo projects are not visible through MCP.
