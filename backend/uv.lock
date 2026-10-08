@@ -823,6 +823,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "fastapi-users", extra = ["sqlalchemy"] },
     { name = "google-auth" },
+    { name = "httpx" },
     { name = "mcp" },
     { name = "pydantic-settings" },
     { name = "python-multipart" },
@@ -833,7 +834,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -848,6 +848,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "fastapi-users", extras = ["sqlalchemy"], specifier = ">=14.0" },
     { name = "google-auth", specifier = ">=2.58.1" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "mcp", specifier = ">=2.3.0" },
     { name = "pydantic-settings", specifier = ">=2.6" },
     { name = "python-multipart", specifier = ">=0.0.17" },
@@ -858,7 +859,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx", specifier = ">=0.27" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "pytest-cov", specifier = ">=6.0" },
