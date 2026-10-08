@@ -242,6 +242,8 @@ class McpToken(Base):
     label: Mapped[str] = mapped_column(String(100))
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)  # sha256 hex; plaintext never stored
     scope: Mapped[str] = mapped_column(String(10), default="read")  # read | write
+    # Project slugs this token may see; None means every project (the owner's own tokens).
+    project_slugs: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = _now()
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -256,6 +258,20 @@ class McpCall(Base):
     tool: Mapped[str] = mapped_column(String(100))
     args_hash: Mapped[str] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(20))  # ok | error | denied | rate_limited
+
+
+class RollupRequest(Base):
+    """A manual "refresh rankings": the on-demand alternative to the weekly query rollup. Queued by the web
+    container or the MCP server and run by the collector, which holds the Google credentials."""
+
+    __tablename__ = "rollup_requests"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    project_id: Mapped[uuid.UUID] = _project_fk()
+    requested_at: Mapped[datetime] = _now()
+    requested_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class InspectRequest(Base):

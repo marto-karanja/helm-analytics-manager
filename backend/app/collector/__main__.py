@@ -13,7 +13,7 @@ from app.collector.runner import MAX_STORED_ERROR_CHARS, _record_run, run_once
 from app.core.config import settings
 from app.db.session import async_session_maker
 from app.indexing import jobs as indexing_jobs
-from app.keywords.rollup import run_gsc_query_rollup
+from app.keywords.rollup import run_gsc_query_rollup, run_rollup_requests
 from app.models.project import CollectorRun
 
 logger = logging.getLogger("helm.collector")
@@ -142,6 +142,10 @@ async def run_pass(backfill_days: int | None, force: bool, only: str | None = No
             await indexing_jobs.run_inspect_requests(async_session_maker, google_session)
         except Exception:  # noqa: BLE001
             logger.exception("Processing manual inspection requests failed")
+        try:  # likewise "Refresh rankings": the manual alternative to the weekly rollup
+            await run_rollup_requests(async_session_maker, google_session)
+        except Exception:  # noqa: BLE001
+            logger.exception("Processing manual ranking refreshes failed")
 
     # Order matters on a first run: the URL list feeds signals, and signals feed inspection priority.
     for kind, work in (

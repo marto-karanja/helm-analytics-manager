@@ -8,13 +8,15 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import scope
 from app.core.app_settings import get_setting
 from app.indexing import classify as rules
-from app.indexing import manual, service
+from app.indexing import manual, rankings, service
 from app.keywords import export as export_mod
 from app.keywords import generator
 from app.keywords import llm as llm_mod
 from app.keywords.launch import launch_run
+from app.models.alerts import AlertEvent
 from app.models.indexing import KeywordCandidate, KeywordRun, PageSignal, SitemapStatus, SitemapUrl, UrlInspection
 from app.models.project import Project, TrafficDaily
 
@@ -33,7 +35,9 @@ def _plain(value: Any) -> Any:
 
 
 async def find_project(db: AsyncSession, slug: str) -> Project:
-    project = (
+    """A project the caller may see. A slug outside the token's scope answers exactly like one that does not
+    exist, so a scoped token cannot learn which other projects there are."""
+    project = None if not scope.permits(slug) else (
         await db.execute(select(Project).where(Project.slug == slug, Project.is_demo.is_(False)))
     ).scalar_one_or_none()
     if project is None:
@@ -43,6 +47,7 @@ async def find_project(db: AsyncSession, slug: str) -> Project:
 
 async def list_projects(db: AsyncSession) -> list[dict]:
     rows = (await db.execute(select(Project).where(Project.is_demo.is_(False)).order_by(Project.name))).scalars().all()
+    rows = [p for p in rows if scope.permits(p.slug)]
     return [
         {
             "slug": p.slug,
@@ -181,6 +186,33 @@ async def get_sitemap_status(db: AsyncSession, slug: str) -> dict:
     )
 
 
+async def get_page_rankings(db: AsyncSession, slug: str, weeks: int, min_impressions: int, limit: int, url: str | None) -> dict:
+    project = await find_project(db, slug)
+    return _plain(await rankings.page_rankings(db, project, weeks, min_impressions, limit, url))
+
+
+ALERT_STATES = ("open", "resolved", "all")
+
+
+async def get_alerts(db: AsyncSession, slug: str, state: str, limit: int = 50) -> dict:
+    project = await find_project(db, slug)
+    if state not in ALERT_STATES:
+        raise McpToolError(f"state must be one of: {', '.join(ALERT_STATES)}")
+    stmt = select(AlertEvent).where(AlertEvent.project_id == project.id)
+    if state != "all":
+        stmt = stmt.where(AlertEvent.state == state)
+    rows = (await db.execute(stmt.order_by(AlertEvent.opened_at.desc()).limit(max(1, min(limit, MAX_LIST))))).scalars().all()
+    return _plain(
+        {
+            "project": slug,
+            "alerts": [
+                {"kind": a.kind, "severity": a.severity, "state": a.state, "opened_at": a.opened_at, "resolved_at": a.resolved_at, "message": a.message}
+                for a in rows
+            ],
+        }
+    )
+
+
 # ------------------------------------------------------------------ write tools
 
 
@@ -191,6 +223,14 @@ async def inspect_url(db: AsyncSession, slug: str, url: str, requested_by: str) 
     except manual.QueueError as exc:
         raise McpToolError(exc.detail) from exc
     return _plain({"queued": True, "budget": result["budget"], "note": "The collector runs queued inspections within about a minute."})
+
+
+async def refresh_rankings(db: AsyncSession, slug: str, requested_by: str) -> dict:
+    project = await find_project(db, slug)
+    try:
+        return _plain(await manual.queue_rollup(db, project, f"mcp:{requested_by}"))
+    except manual.QueueError as exc:
+        raise McpToolError(exc.detail) from exc
 
 
 async def run_keyword_generator(db: AsyncSession, slug: str) -> dict:
@@ -211,7 +251,7 @@ async def set_candidate_status(db: AsyncSession, candidate_id: str, status: str)
         raise McpToolError("candidate_id must be a UUID from list_keyword_candidates") from exc
     candidate = await db.get(KeywordCandidate, key)
     project = await db.get(Project, candidate.project_id) if candidate else None
-    if candidate is None or project is None or project.is_demo:
+    if candidate is None or project is None or project.is_demo or not scope.permits(project.slug):
         raise McpToolError("No such candidate.")
     if candidate.status == "written":
         raise McpToolError("That keyword was already exported to the queue file.")

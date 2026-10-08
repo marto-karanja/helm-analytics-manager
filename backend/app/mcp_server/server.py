@@ -14,6 +14,7 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.core import mcp_tokens
+from app.core import scope as scope_vars
 from app.core.config import settings
 from app.db.session import async_session_maker
 from app.mcp_server import service as svc
@@ -33,6 +34,7 @@ class Caller:
     token_id: str
     label: str
     scope: str
+    projects: frozenset[str] | None = None  # None: every project; otherwise only these slugs
 
 
 current_caller: ContextVar[Caller | None] = ContextVar("helm_mcp_caller", default=None)
@@ -56,6 +58,7 @@ async def _call(tool: str, scope: str, args: dict, work: Callable[..., Awaitable
     if caller is None:
         raise ToolError("Not authenticated.")
     status = "ok"
+    scoped = scope_vars.allowed_slugs.set(caller.projects)
     try:
         if scope == "write" and caller.scope != "write":
             status = "denied"
@@ -76,6 +79,7 @@ async def _call(tool: str, scope: str, args: dict, work: Callable[..., Awaitable
         logger.exception("MCP tool %s failed", tool)
         raise ToolError("Internal error; the failure was logged on the server.") from exc
     finally:
+        scope_vars.allowed_slugs.reset(scoped)
         await _log(caller, tool, args, status)
 
 
@@ -125,6 +129,20 @@ async def get_sitemap_status(project: str) -> dict:
 
 
 @mcp.tool()
+async def get_page_rankings(project: str, weeks: int = 4, min_impressions: int = 10, limit: int = 100, url: str | None = None) -> dict:
+    """Where each page ranks in Google: impression-weighted average position over the last `weeks` weeks (1-12),
+    the change against the previous window (positive = moved up), clicks, impressions, top queries and indexing
+    state. Pass `url` for every query one page ranks for. Includes when the data was last refreshed."""
+    return await _call("get_page_rankings", "read", {"project": project, "weeks": weeks, "min_impressions": min_impressions, "limit": limit, "url": url}, lambda db: svc.get_page_rankings(db, project, weeks, min_impressions, limit, url))
+
+
+@mcp.tool()
+async def get_alerts(project: str, state: str = "open") -> dict:
+    """Alerts for a project (zero impressions, no data, traffic drops, tracking gaps): state is open, resolved or all."""
+    return await _call("get_alerts", "read", {"project": project, "state": state}, lambda db: svc.get_alerts(db, project, state))
+
+
+@mcp.tool()
 async def get_keyword_run_status(project: str) -> dict:
     """The five most recent keyword generator runs for a project, to poll after run_keyword_generator."""
     return await _call("get_keyword_run_status", "read", {"project": project}, lambda db: svc.recent_runs(db, project))
@@ -139,6 +157,15 @@ async def inspect_url(project: str, url: str) -> dict:
     caller = current_caller.get()
     label = caller.label if caller else "unknown"
     return await _call("inspect_url", "write", {"project": project, "url": url}, lambda db: svc.inspect_url(db, project, url, label))
+
+
+@mcp.tool()
+async def refresh_rankings(project: str) -> dict:
+    """Queue an on-demand refresh of the ranking data instead of waiting for the weekly run. At most one per project
+    every 30 minutes; write scope only. Poll get_page_rankings and watch last_refreshed_at."""
+    caller = current_caller.get()
+    label = caller.label if caller else "unknown"
+    return await _call("refresh_rankings", "write", {"project": project}, lambda db: svc.refresh_rankings(db, project, label))
 
 
 @mcp.tool()
@@ -186,7 +213,7 @@ class BearerTokenMiddleware:
             response = JSONResponse({"error": "invalid or missing bearer token"}, status_code=401, headers={"WWW-Authenticate": "Bearer"})
             await response(scope, receive, send)
             return
-        reset = current_caller.set(Caller(token_id=str(token.id), label=token.label, scope=token.scope))
+        reset = current_caller.set(Caller(token_id=str(token.id), label=token.label, scope=token.scope, projects=scope_vars.as_scope(token.project_slugs)))
         try:
             await self.app(scope, receive, send)
         finally:

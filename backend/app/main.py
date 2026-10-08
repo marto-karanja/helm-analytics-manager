@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin, auth, indexing, keywords, projects, reports, sync
+from app.api import admin, auth, indexing, keywords, projects, reports, sync, v1
 from app.core.config import settings
 from app.core.demo_seed import seed_demo_data
 from app.db.session import async_session_maker
@@ -34,6 +34,7 @@ app.include_router(indexing.router, prefix="/api", tags=["indexing"])
 app.include_router(keywords.router, prefix="/api", tags=["keywords"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(admin.router, prefix="/api", tags=["admin"])
+app.include_router(v1.router, prefix="/api")
 
 
 @app.get("/api/health")

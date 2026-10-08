@@ -2,6 +2,7 @@ import uuid
 
 from typing import Any
 
+from fastapi.encoders import jsonable_encoder
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -12,7 +13,7 @@ from app.core.app_settings import get_setting
 from app.core.users import current_active_user
 from app.db.session import get_async_session
 from app.indexing import classify as rules
-from app.indexing import manual, service
+from app.indexing import manual, rankings, service
 from app.models.indexing import IndexingSnapshot, PageSignal, SitemapStatus, SitemapUrl, UrlInspection
 from app.models.project import Project
 from app.models.user import User
@@ -162,6 +163,32 @@ async def inspect_now(
     """Queues one inspection. The collector holds the Google credentials and runs it on its next tick."""
     try:
         return await manual.queue_inspection(session, project, body.url, user.email)
+    except manual.QueueError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.get("/projects/{project_id}/rankings")
+async def get_rankings(
+    weeks: int = Query(4, ge=1, le=rankings.MAX_WEEKS),
+    min_impressions: int = Query(10, ge=0),
+    limit: int = Query(100, ge=1, le=rankings.MAX_PAGES),
+    url: str | None = None,
+    project: Project = Depends(get_project),
+    session: AsyncSession = Depends(get_async_session),
+) -> dict[str, Any]:
+    """Per-page positions from the weekly rollups, with when they were last refreshed."""
+    return jsonable_encoder(await rankings.page_rankings(session, project, weeks, min_impressions, limit, url))
+
+
+@router.post("/projects/{project_id}/rankings/refresh", status_code=status.HTTP_202_ACCEPTED)
+async def refresh_rankings(
+    project: Project = Depends(get_project),
+    user: User = Depends(require_owner),
+    session: AsyncSession = Depends(get_async_session),
+) -> dict[str, Any]:
+    """The manual alternative to the weekly rollup. The collector holds the Google credentials and runs it on its next tick."""
+    try:
+        return await manual.queue_rollup(session, project, user.email)
     except manual.QueueError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 

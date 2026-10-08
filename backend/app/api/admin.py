@@ -27,6 +27,8 @@ class SettingBody(BaseModel):
 class TokenBody(BaseModel):
     label: str = Field(min_length=1, max_length=100)
     scope: Literal["read", "write"] = "read"
+    # Slugs this token may see; omit for every project. A pipeline's token should list only its own site.
+    project_slugs: list[str] | None = None
 
 
 @router.get("/settings")
@@ -61,6 +63,7 @@ def _token_dict(t: McpToken) -> dict[str, Any]:
         "id": t.id,
         "label": t.label,
         "scope": t.scope,
+        "project_slugs": t.project_slugs,
         "created_at": t.created_at,
         "last_used_at": t.last_used_at,
         "revoked_at": t.revoked_at,
@@ -77,7 +80,15 @@ async def list_tokens(user: User = Depends(require_owner), session: AsyncSession
 async def create_token(
     body: TokenBody, user: User = Depends(require_owner), session: AsyncSession = Depends(get_async_session)
 ) -> dict[str, Any]:
-    row, raw = await mcp_tokens.create_token(session, body.label, body.scope)
+    try:
+        if body.project_slugs is not None:
+            known = set((await session.execute(select(Project.slug).where(Project.is_demo.is_(False)))).scalars())
+            unknown = sorted(set(body.project_slugs) - known)
+            if unknown:
+                raise ValueError(f"unknown project slug(s): {', '.join(unknown)}")
+        row, raw = await mcp_tokens.create_token(session, body.label, body.scope, body.project_slugs)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     # The only time the plaintext is ever returned; only its hash is stored.
     return {**_token_dict(row), "token": raw}
 
@@ -114,7 +125,7 @@ async def pull_keyword_queue(
     token = await mcp_tokens.verify_token(session, raw) if scheme.lower() == "bearer" else None
     if token is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    project = (
+    project = None if token.project_slugs is not None and slug not in token.project_slugs else (
         await session.execute(select(Project).where(Project.slug == slug, Project.is_demo.is_(False)))
     ).scalar_one_or_none()
     if project is None:

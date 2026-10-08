@@ -19,15 +19,19 @@ def hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-async def create_token(db: AsyncSession, label: str, scope: str) -> tuple[McpToken, str]:
+async def create_token(db: AsyncSession, label: str, scope: str, project_slugs: list[str] | None = None) -> tuple[McpToken, str]:
     """Returns the row and the plaintext token. The plaintext exists only in this return value."""
     if scope not in SCOPES:
         raise ValueError(f"scope must be one of {', '.join(SCOPES)}")
     label = label.strip()
     if not label or len(label) > 100:
         raise ValueError("label must be 1-100 characters")
+    if project_slugs is not None:
+        project_slugs = sorted({s.strip() for s in project_slugs if s.strip()})
+        if not project_slugs:
+            raise ValueError("project_slugs must list at least one project, or be omitted for all projects")
     raw = TOKEN_PREFIX + secrets.token_urlsafe(32)
-    row = McpToken(label=label, scope=scope, token_hash=hash_token(raw))
+    row = McpToken(label=label, scope=scope, token_hash=hash_token(raw), project_slugs=project_slugs)
     db.add(row)
     await db.commit()
     return row, raw
