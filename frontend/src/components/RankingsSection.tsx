@@ -21,11 +21,18 @@ export function RankingsSection({ projectId, isDemo }: { projectId: string; isDe
   const [data, setData] = React.useState<Rankings | null>(null)
   const [message, setMessage] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
+  const [loadFailed, setLoadFailed] = React.useState(false)
 
   const load = React.useCallback(() => {
     fetchRankings(projectId, weeks, Number(minImpressions) || 0)
-      .then(setData)
-      .catch((err) => setMessage(errorMessage(err, 'Could not load rankings.')))
+      .then((d) => {
+        setLoadFailed(false)
+        setData(d)
+      })
+      .catch((err) => {
+        setLoadFailed(true)
+        setMessage(errorMessage(err, 'Could not load rankings.'))
+      })
   }, [projectId, weeks, minImpressions])
 
   React.useEffect(() => {
@@ -83,7 +90,9 @@ export function RankingsSection({ projectId, isDemo }: { projectId: string; isDe
         {message && <p className="text-sm text-muted-foreground">{message}</p>}
       </CardHeader>
       <CardContent>
-        {data && data.pages.length === 0 ? (
+        {data === null ? (
+          <p className="text-sm text-muted-foreground">{loadFailed ? 'Rankings could not be loaded.' : 'Loading rankings…'}</p>
+        ) : data.pages.length === 0 ? (
           <p className="text-sm text-muted-foreground">{data.note ?? 'No pages meet the impression threshold in this window.'}</p>
         ) : (
           <div className="overflow-x-auto rounded-md border border-border">
