@@ -189,6 +189,8 @@ function McpTokens() {
   const [tokens, setTokens] = React.useState<McpToken[] | null>(null)
   const [label, setLabel] = React.useState('')
   const [scope, setScope] = React.useState<'read' | 'write'>('read')
+  const [allProjects, setAllProjects] = React.useState<Project[]>([])
+  const [chosen, setChosen] = React.useState<string[]>([])
   const [fresh, setFresh] = React.useState<{ label: string; token: string } | null>(null)
   const [message, setMessage] = React.useState<string | null>(null)
   const [copied, setCopied] = React.useState(false)
@@ -196,12 +198,14 @@ function McpTokens() {
   const load = React.useCallback(() => fetchMcpTokens().then(setTokens).catch(() => setMessage('Failed to load tokens.')), [])
   React.useEffect(() => {
     load()
+    fetchProjects().then(setAllProjects).catch(() => setAllProjects([]))
   }, [load])
 
   async function create() {
     setMessage(null)
     try {
-      const created = await createMcpToken(label.trim(), scope)
+      const created = await createMcpToken(label.trim(), scope, chosen.length ? chosen : null)
+      setChosen([])
       setFresh({ label: created.label, token: created.token })
       setLabel('')
       setCopied(false)
@@ -267,13 +271,32 @@ function McpTokens() {
             Create token
           </Button>
         </div>
+        <fieldset className="flex flex-col gap-1">
+          <legend className="text-xs text-muted-foreground">
+            Projects this token can see. Tick the one site a pipeline belongs to; leave all unticked for a token that sees every project.
+          </legend>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {allProjects
+              .filter((p) => p.is_pipeline)
+              .map((p) => (
+                <label key={p.slug} className="flex items-center gap-1.5 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={chosen.includes(p.slug)}
+                    onChange={(e) => setChosen((c) => (e.target.checked ? [...c, p.slug] : c.filter((s) => s !== p.slug)))}
+                  />
+                  {p.slug}
+                </label>
+              ))}
+          </div>
+        </fieldset>
         {message && <p className="text-sm text-destructive">{message}</p>}
 
         <div className="overflow-x-auto rounded-md border border-border">
           <table className="w-full text-sm">
             <thead className="bg-card text-left text-muted-foreground">
               <tr>
-                {['Label', 'Scope', 'Created', 'Last used', ''].map((h, i) => (
+                {['Label', 'Scope', 'Projects', 'Created', 'Last used', ''].map((h, i) => (
                   <th key={`${h}-${i}`} className="px-3 py-2 font-medium">
                     {h}
                   </th>
@@ -287,6 +310,7 @@ function McpTokens() {
                   <td className="px-3 py-1.5">
                     <Badge variant={t.scope === 'write' ? 'yellow' : 'muted'}>{t.scope}</Badge>
                   </td>
+                  <td className="px-3 py-1.5">{t.project_slugs ? t.project_slugs.join(', ') : <span className="text-muted-foreground">all</span>}</td>
                   <td className="px-3 py-1.5 whitespace-nowrap">{formatDateTime(t.created_at)}</td>
                   <td className="px-3 py-1.5 whitespace-nowrap">{formatDateTime(t.last_used_at)}</td>
                   <td className="px-3 py-1.5">

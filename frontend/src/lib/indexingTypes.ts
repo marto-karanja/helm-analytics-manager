@@ -176,7 +176,37 @@ export interface McpToken {
   id: string
   label: string
   scope: 'read' | 'write'
+  /** null means the token sees every project. */
+  project_slugs: string[] | null
   created_at: string
   last_used_at: string | null
   revoked_at: string | null
+}
+
+export interface RankedPage {
+  url: string
+  position: number | null
+  position_prior: number | null
+  /** Positive when the page moved up. */
+  position_change: number | null
+  clicks: number
+  impressions: number
+  ctr: number | null
+  query_count: number
+  top_queries: { query: string; position: number | null; clicks: number; impressions: number }[]
+  indexing: string | null
+  coverage_state: string | null
+}
+
+export interface Rankings {
+  project: string
+  note?: string
+  window?: { weeks: number; first_week_start: string; latest_week_start: string }
+  last_refreshed_at: string | null
+  last_weekly_run_at: string | null
+  last_manual_refresh_at: string | null
+  refresh_pending: boolean
+  total_pages?: number
+  returned?: number
+  pages: RankedPage[]
 }

@@ -11,6 +11,7 @@ import type {
   KeywordList,
   KeywordRun,
   McpToken,
+  Rankings,
   ReportData,
   SettingsData,
   SitemapInfo,
@@ -94,8 +95,21 @@ export async function fetchMcpTokens(): Promise<McpToken[]> {
   return (await api.get<McpToken[]>('/mcp-tokens')).data
 }
 
-export async function createMcpToken(label: string, scope: 'read' | 'write'): Promise<McpToken & { token: string }> {
-  return (await api.post('/mcp-tokens', { label, scope })).data
+export async function createMcpToken(
+  label: string,
+  scope: 'read' | 'write',
+  projectSlugs: string[] | null = null,
+): Promise<McpToken & { token: string }> {
+  return (await api.post('/mcp-tokens', { label, scope, project_slugs: projectSlugs })).data
+}
+
+export async function fetchRankings(projectId: string, weeks: number, minImpressions: number): Promise<Rankings> {
+  return (await api.get<Rankings>(`/projects/${projectId}/rankings`, { params: { weeks, min_impressions: minImpressions, limit: 500 } })).data
+}
+
+/** The manual alternative to the weekly rollup. Rejects with a 409 or 429 whose detail says why. */
+export async function refreshRankings(projectId: string): Promise<void> {
+  await api.post(`/projects/${projectId}/rankings/refresh`)
 }
 
 export async function revokeMcpToken(id: string): Promise<void> {

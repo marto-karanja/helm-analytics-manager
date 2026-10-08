@@ -4,6 +4,7 @@ import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { BacklogChart } from '@/components/BacklogChart'
 import { IndexingSection } from '@/components/IndexingSection'
 import { KeywordsSection } from '@/components/KeywordsSection'
+import { RankingsSection } from '@/components/RankingsSection'
 import { SitemapsSection } from '@/components/SitemapsSection'
 import { TaskBoard } from '@/components/TaskBoard'
 import { TrafficSection } from '@/components/TrafficSection'
@@ -25,6 +26,7 @@ const EDITABLE_FIELDS = [
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'indexing', label: 'Indexing' },
+  { key: 'rankings', label: 'Rankings' },
   { key: 'keywords', label: 'Keywords' },
   { key: 'sitemaps', label: 'Sitemaps' },
 ] as const
@@ -107,6 +109,7 @@ export function ProjectDetailPage() {
       )}
 
       {tab === 'indexing' && <IndexingSection projectId={project.id} isDemo={isDemo} />}
+      {tab === 'rankings' && <RankingsSection projectId={project.id} isDemo={isDemo} />}
       {tab === 'keywords' && <KeywordsSection projectId={project.id} isDemo={isDemo} />}
       {tab === 'sitemaps' && <SitemapsSection projectId={project.id} />}
 
