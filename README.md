@@ -215,6 +215,20 @@ page moved up), top queries and indexing state. The weekly job is the default; *
 Rankings tab, `POST /api/v1/projects/<slug>/rankings/refresh` and the `refresh_rankings` tool queue an on-demand
 pull instead. The collector runs it within about a minute; the limit is one per project every 30 minutes.
 
+### Reports by date
+
+The Reports page shows ten reports (indexing, not indexed, all URLs, page rankings, striking distance,
+cannibalisation, traffic, alerts, keyword candidates, weekly digest) for any past UTC date, and can compare two dates
+(rows marked new, gone, changed or same, with deltas). The state lives in the URL, so a past report can be bookmarked.
+`GET /api/reports/{name}?as_of=YYYY-MM-DD`, `GET /api/reports/{name}/compare?a=&b=`, `/api/reports/catalog` and
+`/api/reports/availability` serve it. Every response says whether it is `current`, `stored` or `reconstructed` and
+where the history begins; a date before that returns a note, never an empty table that looks like zeros.
+
+History is never deleted. `url_status_history` logs how each URL was classified whenever it changes, so a past
+indexing report shows what Helm showed then even if the rules change later. The first query-history pull goes back 480
+days (about the 16 months Search Console keeps); fill older gaps with
+`docker compose run --rm collector uv run --no-dev python -m app.collector --once --job gsc_query_rollup --rollup-backfill-days 480`.
+
 ### REST API for other projects
 
 `/api/v1/...` takes the same bearer tokens as MCP, with the same per-project scoping, rate limit and audit log.
