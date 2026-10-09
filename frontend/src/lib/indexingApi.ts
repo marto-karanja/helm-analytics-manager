@@ -11,8 +11,12 @@ import type {
   KeywordList,
   KeywordRun,
   McpToken,
+  CompareData,
   Rankings,
+  ReportAvailability,
+  ReportCatalogItem,
   ReportData,
+  ReportQuery,
   SettingsData,
   SitemapInfo,
   UrlDetail,
@@ -65,20 +69,38 @@ export async function exportKeywordQueue(projectId: string): Promise<{ count: nu
   return (await api.post(`/projects/${projectId}/keywords/export`)).data
 }
 
-export async function fetchReport(name: string, project?: string): Promise<ReportData> {
-  return (await api.get<ReportData>(`/reports/${name}`, { params: project ? { project } : {} })).data
+function reportParams(query: ReportQuery): Record<string, string | number | boolean> {
+  return Object.fromEntries(Object.entries(query).filter(([, v]) => v !== undefined && v !== '')) as Record<string, string | number | boolean>
+}
+
+export async function fetchReportCatalog(): Promise<ReportCatalogItem[]> {
+  return (await api.get<{ reports: ReportCatalogItem[] }>('/reports/catalog')).data.reports
+}
+
+export async function fetchReportAvailability(project?: string): Promise<ReportAvailability> {
+  return (await api.get<ReportAvailability>('/reports/availability', { params: project ? { project } : {} })).data
+}
+
+export async function fetchReport(name: string, query: ReportQuery = {}): Promise<ReportData> {
+  return (await api.get<ReportData>(`/reports/${name}`, { params: reportParams(query) })).data
+}
+
+export async function fetchCompare(name: string, query: ReportQuery): Promise<CompareData> {
+  return (await api.get<CompareData>(`/reports/${name}/compare`, { params: reportParams(query) })).data
 }
 
 // The CSV needs the bearer token, so it is fetched through axios and handed to the browser as a download.
-export async function downloadReportCsv(name: string, project?: string): Promise<void> {
-  const resp = await api.get<Blob>(`/reports/${name}`, {
-    params: { format: 'csv', ...(project ? { project } : {}) },
+// The server names the file (report, project and dates); the same query that built the table builds the CSV.
+export async function downloadReportCsv(name: string, query: ReportQuery = {}, compare = false): Promise<void> {
+  const resp = await api.get<Blob>(compare ? `/reports/${name}/compare` : `/reports/${name}`, {
+    params: { ...reportParams(query), format: 'csv' },
     responseType: 'blob',
   })
+  const named = /filename="([^"]+)"/.exec(String(resp.headers['content-disposition'] ?? ''))
   const href = URL.createObjectURL(resp.data)
   const link = document.createElement('a')
   link.href = href
-  link.download = `helm-${name}${project ? `-${project}` : ''}.csv`
+  link.download = named?.[1] ?? `helm-${name}.csv`
   link.click()
   URL.revokeObjectURL(href)
 }

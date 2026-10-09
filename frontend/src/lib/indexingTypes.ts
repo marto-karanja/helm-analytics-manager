@@ -152,10 +152,57 @@ export interface KeywordList {
   llm_configured: boolean
 }
 
+export type ReportCell = string | number | boolean | null
+
+export interface ReportMeta {
+  as_of: string
+  /** current: live now; stored: an exact record from that date; reconstructed: rebuilt from history; none: no history. */
+  basis: 'current' | 'stored' | 'reconstructed' | 'none'
+  available_from: string | null
+  available_to: string | null
+  history: string
+  note: string | null
+  out_of_range: boolean
+}
+
 export interface ReportData {
   name: string
   columns: string[]
-  rows: (string | number | boolean | null)[][]
+  rows: ReportCell[][]
+  meta: ReportMeta
+}
+
+export interface CompareData {
+  name: string
+  columns: string[]
+  rows: ReportCell[][]
+  summary: { new: number; gone: number; changed: number; same: number }
+  meta: { a: ReportMeta; b: ReportMeta; notes: string[]; change_column: string }
+}
+
+export interface ReportCatalogItem {
+  name: string
+  label: string
+  blurb: string
+  kind: 'as_of' | 'range'
+  compare_keys: string[]
+  history: string
+}
+
+export interface ReportAvailability {
+  today: string
+  reports: Record<string, { label: string; kind: 'as_of' | 'range'; from: string | null; to: string | null; history: string }>
+}
+
+export interface ReportQuery {
+  project?: string
+  as_of?: string
+  days?: number
+  granularity?: string
+  /** Compare mode: the two dates, A (earlier) and B. */
+  a?: string
+  b?: string
+  changed_only?: boolean
 }
 
 export interface SettingsData {
