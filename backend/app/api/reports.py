@@ -1,26 +1,24 @@
 import re
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.app_settings import get_setting
 from app.core.csv_export import to_csv
 from app.core.users import current_active_user
 from app.db.session import get_async_session
-from app.indexing import classify as rules
-from app.indexing import service
-from app.keywords import queries
 from app.models.indexing import WeeklyDigest
 from app.models.project import Project
 from app.models.user import User
+from app.reports import availability, builders
+from app.reports.catalog import BY_NAME, CATALOG, GRANULARITIES, NAMES
+from app.reports.compare import compare_reports
 
 router = APIRouter()
 
-REPORTS = ("indexing", "non-indexed", "striking-distance", "digest")
-HEALTHY = {rules.INDEXED, rules.UNKNOWN}
+REPORTS = NAMES  # kept for callers that import it
 
 
 async def _projects(session: AsyncSession, user: User, slug: str | None) -> list[Project]:
@@ -33,51 +31,61 @@ async def _projects(session: AsyncSession, user: User, slug: str | None) -> list
     return projects
 
 
-async def build_report(session: AsyncSession, user: User, name: str, slug: str | None) -> dict[str, Any]:
-    projects = await _projects(session, user, slug)
-    thin = await get_setting(session, "thin_word_threshold")
+def _resolve_date(value: date | None, name: str, today: date) -> date:
+    """Today when absent. A day ahead of UTC is tolerated (a reader east of Greenwich), further ahead is refused."""
+    if value is None:
+        return today
+    if value > today + timedelta(days=1):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=f"{name} cannot be in the future")
+    return min(value, today)
 
-    if name == "indexing":
-        columns = ["project", "total_urls", *rules.ISSUES, "indexed_percent"]
-        rows = []
-        for p in projects:
-            counts = service.count_issues(await service.url_statuses(session, p.id, thin))
-            rows.append([p.name, sum(counts.values()), *[counts[i] for i in rules.ISSUES], service.indexed_percent(counts)])
-        return {"name": name, "columns": columns, "rows": rows}
 
-    if name == "non-indexed":
-        columns = ["project", "url", "issue", "coverage_state", "last_crawl_time", "word_count", "http_status", "title"]
-        rows = []
-        for p in projects:
-            for r in await service.url_statuses(session, p.id, thin):
-                if r["issue"] not in HEALTHY:
-                    rows.append([p.name, r["url"], r["issue"], r["coverage_state"], r["last_crawl_time"], r["word_count"], r["http_status"], r["title"]])
-        rows.sort(key=lambda r: (r[0], r[2], r[1]))
-        return {"name": name, "columns": columns, "rows": rows}
+def _check_name(name: str) -> None:
+    if name not in BY_NAME:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown report; choose one of {', '.join(NAMES)}")
 
-    if name == "striking-distance":
-        columns = ["project", "query", "page", "position", "impressions", "clicks"]
-        rows = []
-        for p in projects:
-            for s in queries.striking_distance(await queries.query_stats(session, p.id)):
-                rows.append([p.name, s.query, s.top_page, s.position, s.impressions, s.clicks])
-        return {"name": name, "columns": columns, "rows": rows}
 
-    # digest: the stored weekly snapshots, newest first
-    columns = ["project", "week_start", "clicks", "clicks_change_pct", "impressions", "impressions_change_pct", "indexed_percent", "striking_distance", "pending_keywords"]
-    rows = []
-    for p in projects:
-        digests = (
-            await session.execute(select(WeeklyDigest).where(WeeklyDigest.project_id == p.id).order_by(WeeklyDigest.week_start.desc()).limit(26))
-        ).scalars()
-        for d in digests:
-            t = d.payload.get("traffic", {})
-            rows.append([
-                p.name, d.week_start, t.get("clicks"), t.get("clicks_change_pct"), t.get("impressions"), t.get("impressions_change_pct"),
-                d.payload.get("indexing", {}).get("indexed_percent"), d.payload.get("striking_distance"), d.payload.get("pending_keyword_candidates"),
-            ])
-    rows.sort(key=lambda r: (r[1], r[0]), reverse=True)
-    return {"name": name, "columns": columns, "rows": rows}
+def _params(as_of: date, today: date, granularity: str, days: int, weeks: int, latest_week_only: bool = False) -> builders.Params:
+    if granularity not in GRANULARITIES:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=f"granularity must be one of: {', '.join(GRANULARITIES)}")
+    return builders.Params(as_of=as_of, today=today, granularity=granularity, days=days, weeks=weeks, latest_week_only=latest_week_only)
+
+
+def _csv(report: dict[str, Any], filename: str) -> Response:
+    safe = re.sub(r"[^A-Za-z0-9_-]", "", filename)
+    return Response(
+        to_csv(report["columns"], report["rows"]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="helm-{safe}.csv"'},
+    )
+
+
+@router.get("/reports/catalog")
+async def report_catalog(user: User = Depends(current_active_user)) -> dict[str, Any]:
+    """Every report, how it is compared, and where its history comes from."""
+    return {
+        "reports": [
+            {"name": s.name, "label": s.label, "blurb": s.blurb, "kind": s.kind, "compare_keys": list(s.keys), "history": s.history}
+            for s in CATALOG
+        ],
+        "granularities": list(GRANULARITIES),
+    }
+
+
+@router.get("/reports/availability")
+async def report_availability(
+    project: str | None = Query(None, max_length=100),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+) -> dict[str, Any]:
+    """The first and last date each report can answer for, so a date picker can refuse impossible dates."""
+    projects = await _projects(session, user, project)
+    today = builders.today_utc()
+    out = {}
+    for spec in CATALOG:
+        first, last = await availability.bounds(session, spec.name, [p.id for p in projects], today)
+        out[spec.name] = {"label": spec.label, "kind": spec.kind, "from": first, "to": last, "history": spec.history}
+    return {"today": today, "reports": out}
 
 
 @router.get("/reports/{name}")
@@ -85,20 +93,55 @@ async def get_report(
     name: str,
     project: str | None = Query(None, max_length=100),
     format: str = Query("json", pattern="^(json|csv)$"),
+    as_of: date | None = Query(None, description="The state on this UTC date (inclusive); default today"),
+    days: int = Query(builders.DEFAULT_TRAFFIC_DAYS, ge=1, le=builders.MAX_TRAFFIC_DAYS, description="Traffic: period length ending on the date"),
+    granularity: str = Query("total", description="Traffic: total, day, week or month"),
+    weeks: int = Query(builders.DEFAULT_DIGEST_WEEKS, ge=1, le=builders.MAX_DIGEST_WEEKS, description="Digest: how many weeks to list"),
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ):
-    if name not in REPORTS:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown report; choose one of {', '.join(REPORTS)}")
-    report = await build_report(session, user, name, project)
+    _check_name(name)
+    today = builders.today_utc()
+    day = _resolve_date(as_of, "as_of", today)
+    projects = await _projects(session, user, project)
+    report = (await builders.build(session, projects, name, _params(day, today, granularity, days, weeks))).as_dict()
     if format == "csv":
-        safe = re.sub(r"[^A-Za-z0-9_-]", "", f"{name}-{project or 'all'}")
-        return Response(
-            to_csv(report["columns"], report["rows"]),
-            media_type="text/csv",
-            headers={"Content-Disposition": f'attachment; filename="helm-{safe}-{date.today().isoformat()}.csv"'},
-        )
+        return _csv(report, f"{name}-{project or 'all'}-{day.isoformat()}")
     return report
+
+
+@router.get("/reports/{name}/compare")
+async def compare_report(
+    name: str,
+    a: date = Query(..., description="First date (UTC)"),
+    b: date = Query(..., description="Second date (UTC)"),
+    project: str | None = Query(None, max_length=100),
+    format: str = Query("json", pattern="^(json|csv)$"),
+    changed_only: bool = Query(False, description="Leave out rows that are identical at both dates"),
+    days: int = Query(builders.DEFAULT_TRAFFIC_DAYS, ge=1, le=builders.MAX_TRAFFIC_DAYS),
+    granularity: str = Query("total"),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """The same report at two dates, matched row by row: new, gone, changed or same, with deltas for numbers.
+    For traffic, each date ends a period of `days` days."""
+    _check_name(name)
+    today = builders.today_utc()
+    day_a, day_b = _resolve_date(a, "a", today), _resolve_date(b, "b", today)
+    projects = await _projects(session, user, project)
+    latest_only = name == "digest"
+    report_a = await builders.build(session, projects, name, _params(day_a, today, granularity, days, 1, latest_only))
+    report_b = await builders.build(session, projects, name, _params(day_b, today, granularity, days, 1, latest_only))
+    result = compare_reports(report_a, report_b, BY_NAME[name].keys, changed_only)
+    result["meta"] = {
+        "a": report_a.meta,
+        "b": report_b.meta,
+        "notes": [n for n in (report_a.meta.get("note"), report_b.meta.get("note")) if n],
+        "change_column": "new = only at B, gone = only at A. For positions a negative delta means the page moved up.",
+    }
+    if format == "csv":
+        return _csv(result, f"{name}-compare-{project or 'all'}-{day_a.isoformat()}-{day_b.isoformat()}")
+    return result
 
 
 @router.get("/reports/digest/{project_slug}/{week}")
