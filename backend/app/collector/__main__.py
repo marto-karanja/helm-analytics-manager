@@ -96,7 +96,7 @@ async def _skipped(reason: str) -> dict:
     return {"status": "skipped", "detail": {"reason": reason}, "rows": 0}
 
 
-async def run_pass(backfill_days: int | None, force: bool, only: str | None = None) -> None:
+async def run_pass(backfill_days: int | None, force: bool, only: str | None = None, rollup_backfill_days: int | None = None) -> None:
     """One scheduler tick: every job that is due (or all of them when forced) runs once."""
 
     def wanted(kind: str) -> bool:
@@ -135,7 +135,7 @@ async def run_pass(backfill_days: int | None, force: bool, only: str | None = No
     async def query_rollup() -> dict:
         if google_session is None:
             return await _skipped("no credentials")
-        return await run_gsc_query_rollup(async_session_maker, google_session)
+        return await run_gsc_query_rollup(async_session_maker, google_session, backfill_days=rollup_backfill_days)
 
     if google_session is not None and only is None:
         try:  # every tick, not on an interval: "Inspect now" should not wait a day
@@ -158,16 +158,17 @@ async def run_pass(backfill_days: int | None, force: bool, only: str | None = No
             await _run_job(kind, work)
 
 
-async def loop(backfill_days: int | None, once: bool, only: str | None = None) -> None:
+async def loop(backfill_days: int | None, once: bool, only: str | None = None, rollup_backfill_days: int | None = None) -> None:
     while True:
         try:
-            await run_pass(backfill_days, force=once, only=only)
+            await run_pass(backfill_days, force=once, only=only, rollup_backfill_days=rollup_backfill_days)
         except Exception:  # noqa: BLE001 -- e.g. the due-check query failing while the database is down
             logger.exception("Scheduler pass failed")
         if once:
             return
         await asyncio.sleep(settings.scheduler_tick_seconds)
         backfill_days = None  # an override only applies to the first pass
+        rollup_backfill_days = None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -175,6 +176,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--once", action="store_true", help="run every job once, due or not, and exit")
     parser.add_argument("--job", choices=sorted(HEALTHY_MAX_AGE), help="restrict to one job kind")
     parser.add_argument("--backfill-days", type=int, help="override the traffic pull window (days back)")
+    parser.add_argument("--rollup-backfill-days", type=int, help="pull this many days of query/page history (max ~480; Search Console keeps about 16 months)")
     parser.add_argument("--healthcheck", action="store_true", help="exit 0 if healthy, 1 otherwise")
     args = parser.parse_args(argv)
 
@@ -182,7 +184,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if asyncio.run(is_healthy()) else 1
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    asyncio.run(loop(args.backfill_days, args.once, args.job))
+    asyncio.run(loop(args.backfill_days, args.once, args.job, args.rollup_backfill_days))
     return 0
 
 

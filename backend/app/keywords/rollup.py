@@ -22,7 +22,7 @@ URL = "https://searchconsole.googleapis.com/webmasters/v3/sites/{site}/searchAna
 ROW_LIMIT = 25000
 MAX_PAGES = 20  # 500k rows per project per pull is far beyond what these sites produce
 REFRESH_DAYS = 35
-BACKFILL_DAYS = 120
+BACKFILL_DAYS = 480  # about the 16 months Search Console keeps; Helm then keeps what it pulled indefinitely
 UPSERT_CHUNK = 3000
 
 
@@ -89,14 +89,16 @@ async def upsert_rollups(db: AsyncSession, project_id, rows: list[dict]) -> int:
     return len(rows)
 
 
-async def rollup_project(session_factory: Callable, google_session, project, today: date) -> dict:
-    """Pulls and stores one project's weekly rollups and rebuilds its digest. Raises on failure."""
+async def rollup_project(session_factory: Callable, google_session, project, today: date, backfill_days: int | None = None) -> dict:
+    """Pulls and stores one project's weekly rollups and rebuilds its digest. Raises on failure.
+
+    `backfill_days` forces a pull of that many days back (to fill history older than a previous, shorter pull)."""
     end = today - timedelta(days=GSC_LAG_DAYS)
     async with session_factory() as db:
         has_rows = (
             await db.execute(select(func.count()).select_from(GscQueryRollup).where(GscQueryRollup.project_id == project.id))
         ).scalar_one()
-        days = REFRESH_DAYS if has_rows else BACKFILL_DAYS
+        days = backfill_days or (REFRESH_DAYS if has_rows else BACKFILL_DAYS)
         # Start on a week boundary so the first (partial) week is re-aggregated from complete data.
         start = week_start(end - timedelta(days=days))
         raw = await asyncio.to_thread(fetch_gsc_query_rows, google_session, project.gsc_site_url, start, end)
@@ -110,12 +112,12 @@ async def rollup_project(session_factory: Callable, google_session, project, tod
     return {"status": "ok", "rows": n, "raw_rows": len(raw)}
 
 
-async def run_gsc_query_rollup(session_factory: Callable, google_session, today: date | None = None) -> dict:
+async def run_gsc_query_rollup(session_factory: Callable, google_session, today: date | None = None, backfill_days: int | None = None) -> dict:
     today = today or date.today()
     detail: dict[str, dict] = {}
     for project in await _projects(session_factory, with_gsc=True):
         try:
-            detail[project.slug] = await rollup_project(session_factory, google_session, project, today)
+            detail[project.slug] = await rollup_project(session_factory, google_session, project, today, backfill_days)
         except Exception as exc:  # noqa: BLE001
             logger.exception("query rollup failed for %s", project.slug)
             detail[project.slug] = {"status": "error", "errors": [f"{type(exc).__name__}: {exc}"[:300]]}
