@@ -137,12 +137,23 @@ async def refresh_state(db: AsyncSession, project: Project) -> dict:
 
 
 async def page_rankings(
-    db: AsyncSession, project: Project, weeks: int = 4, min_impressions: int = 10, limit: int = 100, url: str | None = None
+    db: AsyncSession,
+    project: Project,
+    weeks: int = 4,
+    min_impressions: int = 10,
+    limit: int = 100,
+    url: str | None = None,
+    as_of: date | None = None,
 ) -> dict:
+    """`as_of` anchors the window at the latest week that had fully ended by that date, so a past report never
+    includes data pulled afterwards. Without it the window ends at the newest week stored."""
     weeks = max(1, min(weeks, MAX_WEEKS))
     limit = max(1, min(limit, MAX_PAGES))
     state = await refresh_state(db, project)
-    latest = (await db.execute(select(func.max(GscQueryRollup.week_start)).where(GscQueryRollup.project_id == project.id))).scalar_one()
+    newest = select(func.max(GscQueryRollup.week_start)).where(GscQueryRollup.project_id == project.id)
+    if as_of is not None:
+        newest = newest.where(GscQueryRollup.week_start <= as_of - timedelta(days=6))
+    latest = (await db.execute(newest)).scalar_one()
     if latest is None:
         return {
             "project": project.slug,
@@ -153,11 +164,16 @@ async def page_rankings(
     first = latest - timedelta(weeks=weeks - 1)
     current = await _window_rows(db, project.id, first, latest)
     prior = await _window_rows(db, project.id, first - timedelta(weeks=weeks), first - timedelta(weeks=1))
-    statuses = await service.url_statuses(db, project.id, await get_setting(db, "thin_word_threshold"))
+    thin = await get_setting(db, "thin_word_threshold")
+    if as_of is None:
+        statuses = await service.url_statuses(db, project.id, thin)
+    else:
+        statuses, _ = await service.status_as_of(db, project.id, thin, service.end_of_day(as_of))
     indexing = {normalise_url(r["url"]): r for r in statuses}
     result = build_rankings(current, prior, indexing, min_impressions, limit, url)
     return {
         "project": project.slug,
+        "as_of": as_of,
         "window": {"weeks": weeks, "first_week_start": first, "latest_week_start": latest},
         "position_note": "Impression-weighted mean over the page's queries; lower is better. position_change is positive when the page moved up. The latest week may be partial and Search Console data trails by about 3 days.",
         **state,

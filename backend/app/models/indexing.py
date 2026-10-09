@@ -147,6 +147,31 @@ class GscQueryRollup(Base):
     position_avg: Mapped[float] = mapped_column(Float, default=0.0)
 
 
+class UrlStatusHistory(Base):
+    """Append-only log of how each sitemap URL was classified, written whenever something about it changes.
+
+    A report for a past date reads the newest row at or before that date, so it shows what Helm showed then even
+    if the classification rules or the thin-word threshold have changed since. `issue` is NULL on the row that
+    records a URL leaving the sitemap. Nothing in the app ever deletes from this table."""
+
+    __tablename__ = "url_status_history"
+    __table_args__ = (Index("ix_url_status_history_project_url_from", "project_id", "url", "valid_from"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    project_id: Mapped[uuid.UUID] = _project_fk()
+    url: Mapped[str] = mapped_column(Text)
+    valid_from: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    issue: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    verdict: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    coverage_state: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_crawl_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    inspected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    first_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class WeeklyDigest(Base):
     """Frozen per-project weekly snapshot for the digest report."""
 
