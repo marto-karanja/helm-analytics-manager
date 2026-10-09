@@ -15,12 +15,14 @@ checked for presence, never clicked, so the smoke test cannot spend quota or cha
 import argparse
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from playwright.sync_api import Page, sync_playwright
 
 OUT = Path(__file__).parent / "out"
 PROJECT_TABS = ["Indexing", "Rankings", "Keywords", "Sitemaps"]
+REPORT_BUTTONS = ["Indexing", "Not indexed", "All URLs", "Page rankings", "Striking distance", "Cannibalisation", "Traffic", "Alerts", "Keyword candidates", "Weekly digest"]
 # Responses that are normal for a signed-out visitor and must not fail the run.
 EXPECTED_STATUS = {("GET", "/api/users/me", 401)}
 
@@ -46,6 +48,79 @@ def settle(page: Page) -> None:
     """Network idle is not enough: a section fires its fetch after it renders. Wait until no "Loading" text is left."""
     page.wait_for_load_state("networkidle")
     page.wait_for_function("() => !document.body.innerText.includes('Loading')", timeout=20000)
+
+
+def badge_text(page: Page, contains: str | None = None, timeout: int = 20000) -> str:
+    """Waits for the report's basis badge (it disappears while a report loads) and returns its text. Optionally
+    waits until it contains `contains`, e.g. the date just picked. Returns "" if it never appears."""
+    try:
+        page.get_by_test_id("report-basis").wait_for(state="visible", timeout=timeout)
+        if contains:
+            page.wait_for_function(
+                "(needle) => document.querySelector('[data-testid=report-basis]')?.innerText.includes(needle)", arg=contains, timeout=timeout
+            )
+        return page.get_by_test_id("report-basis").inner_text()
+    except Exception:  # noqa: BLE001 -- a timeout is the failure the caller reports
+        return ""
+
+
+def utc_day(days_ago: int) -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+
+
+def check_reports(page: Page, base: str) -> int:
+    """The dated Reports page: every report, a past date picked through the date input, compare, a date before any
+    history, and the CSV download. All read-only."""
+    failures = 0
+    page.goto(f"{base}/reports", wait_until="networkidle")
+    settle(page)
+    for label in REPORT_BUTTONS:
+        page.get_by_role("group", name="Report").get_by_role("button", name=label, exact=True).click()
+        settle(page)
+        shown = badge_text(page)
+        body = page.locator("main, body").first.inner_text().lower()
+        failures += not step(f"report {label}", bool(shown) and "failed to load" not in body, " ".join(shown.split()) or "no basis badge")
+    page.screenshot(path=str(OUT / "05-reports-last.png"))
+
+    # Pick a past date through the real date input; the page state lives in the URL.
+    page.goto(f"{base}/reports", wait_until="networkidle")
+    settle(page)
+    past = utc_day(30)
+    page.get_by_label("Report date").fill(past)
+    settle(page)
+    failures += not step("date input updates the URL", f"date={past}" in page.url, page.url.split("?")[-1])
+    failures += not step("badge shows the picked date", bool(badge_text(page, contains=past)))
+    page.screenshot(path=str(OUT / "06-reports-past.png"))
+
+    page.get_by_role("button", name="1 week ago").click()
+    settle(page)
+    failures += not step("quick date '1 week ago' sets the date", f"date={utc_day(7)}" in page.url or "date=" in page.url)
+
+    page.goto(f"{base}/reports?date={utc_day(30)}&compare={utc_day(60)}", wait_until="networkidle")
+    settle(page)
+    summary = page.get_by_test_id("compare-summary")
+    ok = summary.is_visible() and all(w in summary.inner_text() for w in ("new", "gone", "changed", "same"))
+    failures += not step("compare shows new / gone / changed / same", ok, " ".join(summary.inner_text().split()) if summary.count() else "no summary")
+    failures += not step("compare has A and B basis badges", badge_text(page).count("20") >= 2)
+    page.screenshot(path=str(OUT / "07-reports-compare.png"))
+
+    page.goto(f"{base}/reports?date=2020-01-01", wait_until="networkidle")
+    settle(page)
+    note = page.get_by_role("note").first.inner_text().lower() if page.get_by_role("note").count() else ""
+    failures += not step("a date before any history explains itself instead of showing zeros", "history begins" in note and page.locator("table").count() == 0, note[:70])
+
+    page.goto(f"{base}/reports?report=traffic&granularity=week", wait_until="networkidle")
+    settle(page)
+    failures += not step("traffic report offers period and rows controls", page.get_by_label("Period").is_visible() and page.get_by_label("Rows").is_visible())
+
+    page.goto(f"{base}/reports", wait_until="networkidle")
+    settle(page)
+    with page.expect_download(timeout=20000) as download:
+        page.get_by_role("button", name="CSV").click()
+    path = download.value.path()
+    first_line = Path(path).read_text(encoding="utf-8").splitlines()[0]
+    failures += not step("CSV download matches the report", download.value.suggested_filename.endswith(".csv") and first_line.startswith("project,"), download.value.suggested_filename)
+    return failures
 
 
 def step(name: str, ok: bool, detail: str = "") -> bool:
@@ -100,6 +175,8 @@ def run(base: str, headed: bool) -> int:
                 page.screenshot(path=str(OUT / f"04-tab-{tab.lower()}.png"))
             break
         failures += not step("a pipeline project with tabs exists", tabs_checked)
+
+        failures += check_reports(page, base)
 
         if os.environ.get("HELM_E2E_EMAIL") and os.environ.get("HELM_E2E_PASSWORD"):
             failures += check_owner(page, base, hrefs)
