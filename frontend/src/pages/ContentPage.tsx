@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import { Link } from 'react-router-dom'
 import { SeverityBadge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TD, TH, THead, TR } from '@/components/ui/table'
 import { fetchContentDashboard } from '@/lib/api'
 import { formatNumber } from '@/lib/traffic'
 import type { ContentDashboard, ContentItem, ContentPoint } from '@/lib/types'
@@ -22,10 +23,10 @@ function formatDate(iso: string | null): string {
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardContent className="p-4">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+        <p className="mt-1 text-xl sm:text-2xl font-semibold tabular-nums">{value}</p>
         {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
       </CardContent>
     </Card>
@@ -55,44 +56,44 @@ const COLUMNS = ['Site', 'Status', 'Published', 'In queue', 'Blocked', 'Per day'
 
 function ContentTable({ items }: { items: ContentItem[] }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-card">
-      <table className="w-full text-sm">
-        <thead className="text-left text-muted-foreground">
-          <tr>
-            {COLUMNS.map((h) => (
-              <th key={h} className={`px-4 py-2 font-medium ${h === 'Site' || h === 'Status' ? '' : 'text-right'}`}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((i) => (
-            <tr key={i.project_id} className="border-t border-border">
-              <td className="px-4 py-2">
-                <Link to={`/projects/${i.project_id}`} className="font-medium hover:underline">
-                  {i.name}
-                </Link>
-              </td>
-              <td className="px-4 py-2">
-                <SeverityBadge severity={i.severity} />
-              </td>
-              <td className="px-4 py-2 text-right tabular-nums">{formatNumber(i.published)}</td>
-              <td className={`px-4 py-2 text-right tabular-nums ${i.queued === 0 ? 'font-medium text-destructive' : ''}`}>
-                {formatNumber(i.queued)}
-              </td>
-              <td className="px-4 py-2 text-right tabular-nums">{formatNumber(i.blocked)}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{i.published_per_day === null ? '—' : i.published_per_day.toFixed(1)}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{formatDays(i.days_to_clear_queue)}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{formatDate(i.last_published_at)}</td>
-              <td className="px-4 py-2 text-right">
-                <Spark points={i.history} field="queued" label={`${i.name} queue`} />
-              </td>
-            </tr>
+    <Table>
+      <THead>
+        <tr>
+          {COLUMNS.map((h) => (
+            <TH key={h} numeric={h !== 'Site' && h !== 'Status'} sticky={h === 'Site'} className="whitespace-nowrap">
+              {h}
+            </TH>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </tr>
+      </THead>
+      <tbody>
+        {items.map((i) => (
+          <TR key={i.project_id}>
+            <TD sticky className="whitespace-nowrap">
+              <Link to={`/projects/${i.project_id}`} className="font-medium hover:underline">
+                {i.name}
+              </Link>
+            </TD>
+            <TD>
+              <SeverityBadge severity={i.severity} />
+            </TD>
+            <TD numeric>{formatNumber(i.published)}</TD>
+            <TD numeric className={i.queued === 0 ? 'font-medium text-destructive' : ''}>
+              {formatNumber(i.queued)}
+            </TD>
+            <TD numeric>{formatNumber(i.blocked)}</TD>
+            <TD numeric>{i.published_per_day === null ? '—' : i.published_per_day.toFixed(1)}</TD>
+            <TD numeric>{formatDays(i.days_to_clear_queue)}</TD>
+            <TD numeric className="whitespace-nowrap">
+              {formatDate(i.last_published_at)}
+            </TD>
+            <TD numeric>
+              <Spark points={i.history} field="queued" label={`${i.name} queue`} />
+            </TD>
+          </TR>
+        ))}
+      </tbody>
+    </Table>
   )
 }
 
@@ -111,8 +112,8 @@ function ShareChart({ items }: { items: ContentItem[] }) {
           cursor={{ fill: 'var(--color-muted)' }}
         />
         <Legend wrapperStyle={{ fontSize: 12 }} />
-        <Bar dataKey="Published" stackId="a" fill="var(--color-primary)" isAnimationActive={false} />
-        <Bar dataKey="In queue" stackId="a" fill="var(--color-severity-yellow)" isAnimationActive={false} />
+        <Bar dataKey="Published" stackId="a" fill="var(--color-chart-1)" isAnimationActive={false} />
+        <Bar dataKey="In queue" stackId="a" fill="var(--color-chart-3)" isAnimationActive={false} />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -148,7 +149,7 @@ export function ContentPage() {
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             <Kpi label="Published" value={formatNumber(totals.published)} hint={`${totals.pipelines} pipelines`} />
             <Kpi
               label="In queue"
