@@ -96,3 +96,41 @@ export interface ProjectDetail extends Project {
   pipeline_snapshots: PipelineSnapshot[]
   traffic_snapshots: TrafficSnapshot[]
 }
+
+export interface ContentPoint {
+  at: string
+  published: number | null
+  queued: number | null
+}
+
+export interface ContentItem {
+  project_id: string
+  slug: string
+  name: string
+  url: string
+  published: number | null
+  queued: number | null
+  blocked: number | null
+  oldest_queued_days: number | null
+  last_published_at: string | null
+  last_synced_at: string | null
+  severity: string | null
+  published_per_day: number | null
+  days_to_clear_queue: number | null
+  history: ContentPoint[]
+}
+
+export interface ContentTotals {
+  published: number
+  queued: number
+  blocked: number
+  published_per_day: number
+  days_to_clear_queue: number | null
+  pipelines: number
+  pipelines_empty: number
+}
+
+export interface ContentDashboard {
+  totals: ContentTotals
+  items: ContentItem[]
+}

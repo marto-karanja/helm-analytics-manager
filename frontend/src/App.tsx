@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from '@/components/Layout'
 import { useAuth } from '@/contexts/AuthContext'
+import { ContentPage } from '@/pages/ContentPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { OverviewPage } from '@/pages/OverviewPage'
 import { ReportsPage } from '@/pages/ReportsPage'
@@ -27,6 +28,7 @@ export default function App() {
         }
       >
         <Route path="/" element={<OverviewPage />} />
+        <Route path="/content" element={<ContentPage />} />
         <Route path="/traffic" element={<TrafficPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/reports" element={<ReportsPage />} />

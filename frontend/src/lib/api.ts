@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Project, ProjectDetail, Task, TrafficData, TrafficOverviewItem } from './types'
+import type { ContentDashboard, Project, ProjectDetail, Task, TrafficData, TrafficOverviewItem } from './types'
 
 export const TOKEN_STORAGE_KEY = 'helm_access_token'
 
@@ -66,5 +66,10 @@ export async function createTask(projectId: string, title: string): Promise<Task
 
 export async function updateTask(taskId: string, data: Partial<Pick<Task, 'title' | 'status' | 'priority'>>): Promise<Task> {
   const resp = await api.patch<Task>(`/tasks/${taskId}`, data)
+  return resp.data
+}
+
+export async function fetchContentDashboard(): Promise<ContentDashboard> {
+  const resp = await api.get<ContentDashboard>('/content/dashboard')
   return resp.data
 }

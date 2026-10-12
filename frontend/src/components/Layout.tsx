@@ -1,4 +1,4 @@
-import { FileText, LayoutGrid, LineChart, ListChecks, LogOut, Settings } from 'lucide-react'
+import { FileText, LayoutGrid, Newspaper, LineChart, ListChecks, LogOut, Settings } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -31,6 +31,9 @@ export function Layout() {
           <nav className="flex shrink-0 items-center gap-0.5 sm:gap-1">
             <NavLink to="/" end title="Overview" aria-label="Overview" className={navLinkClass}>
               <LayoutGrid size={16} /> <span className="hidden sm:inline">Overview</span>
+            </NavLink>
+            <NavLink to="/content" title="Content" aria-label="Content" className={navLinkClass}>
+              <Newspaper size={16} /> <span className="hidden sm:inline">Content</span>
             </NavLink>
             <NavLink to="/traffic" title="Traffic" aria-label="Traffic" className={navLinkClass}>
               <LineChart size={16} /> <span className="hidden sm:inline">Traffic</span>
