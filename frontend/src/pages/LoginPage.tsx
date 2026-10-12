@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -49,7 +50,8 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Helm Analytics Manager</CardTitle>
+          <Logo size={40} tagline className="mb-2" />
+          <CardTitle className="sr-only">Helm Analytics Manager</CardTitle>
           <CardDescription>Sign in to view your portfolio.</CardDescription>
         </CardHeader>
         <CardContent>

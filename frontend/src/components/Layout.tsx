@@ -1,5 +1,6 @@
 import { FileText, LayoutGrid, LineChart, ListChecks, LogOut, Settings } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,7 +25,7 @@ export function Layout() {
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-3 py-3 sm:px-4">
           <span className="flex items-center gap-2 text-sm font-semibold">
-            Helm Analytics Manager
+            <Logo size={28} />
             {isDemo && <Badge variant="outline">Demo mode — read-only</Badge>}
           </span>
           <nav className="flex shrink-0 items-center gap-0.5 sm:gap-1">

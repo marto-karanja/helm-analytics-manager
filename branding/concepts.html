@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Helm logo concepts</title>
+<style>
+body{font:14px system-ui,sans-serif;margin:0;padding:24px;background:#f6f7fb;color:#111}
+h1{font-size:18px;margin:0 0 16px}
+.grid{display:grid;grid-template-columns:120px repeat(2,1fr);gap:12px;max-width:900px}
+.panel{border-radius:12px;padding:16px;display:flex;align-items:center;gap:20px;min-height:72px}
+.light{background:#fff;border:1px solid #e3e5ee}.dark{background:#14161f;color:#eee}
+.label{display:flex;flex-direction:column;justify-content:center;font-weight:600}
+.label small{font-weight:400;color:#666}
+.word{font-weight:650;font-size:20px;letter-spacing:-.02em}
+.tab{display:flex;align-items:center;gap:6px;font-size:12px;border-radius:6px;padding:4px 8px}
+.light .tab{background:#eef0f6}.dark .tab{background:#262a38}
+svg{display:block}
+</style></head><body>
+<h1>Helm logo concepts: tile at 16 / 32 / 64 px, lockup, tab strip. Light and dark.</h1>
+<svg width="0" height="0" style="position:absolute"><defs>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#14b8a6"/></linearGradient>
+<symbol id="A" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="url(#g)"/>
+<g fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"><circle cx="32" cy="32" r="12"/>
+<path d="M32 20V10M21.6 38L12.9 43M42.4 38l8.7 5"/></g><circle cx="32" cy="32" r="3.5" fill="#fff"/></symbol>
+<symbol id="B" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="url(#g)"/>
+<g fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M45.2 31.2A15 15 0 1 1 28 19.2"/><path d="M26 40L46 20"/></g><circle cx="46" cy="20" r="4.5" fill="#fff"/></symbol>
+<symbol id="C" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="url(#g)"/>
+<g fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M21 17V47M43 17V47M21 38L43 27"/></g>
+<circle cx="43" cy="27" r="4.5" fill="#fff"/></symbol>
+<symbol id="Cm" viewBox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"><path d="M21 17V47M43 17V47M21 38L43 27"/></g><circle cx="43" cy="27" r="4.5" fill="currentColor"/></symbol>
+</defs></svg>
+<div class="grid" id="grid"></div>
+<script>
+const rows=[["A","Wheel","ring, three spokes"],["B","Wheel + trend","open ring, rising line"],["C","H + trend","recommended"]];
+const g=document.getElementById('grid');
+for(const [id,name,note] of rows){
+ g.insertAdjacentHTML('beforeend',`<div class="label">${id}: ${name}<small>${note}</small></div>`);
+ for(const th of ['light','dark']){
+  g.insertAdjacentHTML('beforeend',`<div class="panel ${th}">
+   ${[16,32,64].map(s=>`<svg width="${s}" height="${s}"><use href="#${id}"/></svg>`).join('')}
+   <span style="display:flex;align-items:center;gap:8px"><svg width="28" height="28"><use href="#${id}"/></svg><span class="word">Helm</span></span>
+   <span class="tab"><svg width="16" height="16"><use href="#${id}"/></svg>Helm: SEO operations</span></div>`);
+ }
+}
+g.insertAdjacentHTML('beforeend',`<div class="label">C mono<small>currentColor, no tile</small></div>
+<div class="panel light"><svg width="32" height="32"><use href="#Cm"/></svg></div><div class="panel dark"><svg width="32" height="32"><use href="#Cm"/></svg></div>`);
+</script></body></html>
