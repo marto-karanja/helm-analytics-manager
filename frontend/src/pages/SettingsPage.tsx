@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input, Label, Select } from '@/components/ui/input'
-import { useAuth } from '@/contexts/AuthContext'
 import { fetchProjects } from '@/lib/api'
 import {
   createMcpToken,
@@ -340,7 +339,6 @@ function McpTokens() {
 }
 
 export function SettingsPage() {
-  const { isDemo } = useAuth()
   const [data, setData] = React.useState<SettingsData | null>(null)
   const [projects, setProjects] = React.useState<Project[]>([])
   const [error, setError] = React.useState<string | null>(null)
@@ -363,7 +361,7 @@ export function SettingsPage() {
       {!data.editable && <p className="text-sm text-muted-foreground">The demo account can look but not change anything.</p>}
       <IndexingSettings data={data} projects={projects} editable={data.editable} />
       <KeywordSettings data={data} editable={data.editable} />
-      {!isDemo && <McpTokens />}
+      {data.editable && <McpTokens />}
     </div>
   )
 }
