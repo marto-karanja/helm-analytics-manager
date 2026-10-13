@@ -13,6 +13,9 @@ HELM_E2E_EMAIL and HELM_E2E_PASSWORD are set in the environment, and they only r
 checked for presence, never clicked, so the smoke test cannot spend quota or change data.
 """
 import argparse
+import sys as _sys
+
+_sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # report text may contain symbols a Windows console cannot encode
 import os
 import sys
 from datetime import datetime, timedelta, timezone
