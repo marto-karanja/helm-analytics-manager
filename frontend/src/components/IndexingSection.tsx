@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CHART, TOOLTIP_PROPS } from '@/lib/chartTheme'
 import { X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,15 +16,9 @@ import {
 import { formatDate, formatDateTime, ISSUE_HINT, ISSUE_LABEL, ISSUE_ORDER, issueVariant, shortPath } from '@/lib/indexing'
 import type { IndexedUrl, IndexIssue, IndexingSummary, UrlDetail } from '@/lib/indexingTypes'
 import { formatNumber } from '@/lib/traffic'
+import { PageLoading } from '@/components/ui/skeleton'
 
 const PAGE_SIZE = 50
-const TOOLTIP_STYLE = {
-  background: 'var(--color-card)',
-  border: '1px solid var(--color-border)',
-  borderRadius: 6,
-  fontSize: 12,
-}
-
 function IssueBadge({ issue }: { issue: IndexIssue }) {
   return <Badge variant={issueVariant(issue)}>{ISSUE_LABEL[issue]}</Badge>
 }
@@ -39,12 +34,10 @@ function IndexedTrend({ history }: { history: IndexingSummary['history'] }) {
         <XAxis dataKey="date" hide />
         <YAxis hide domain={['auto', 'auto']} />
         <Tooltip
-          contentStyle={TOOLTIP_STYLE}
-          labelStyle={{ color: 'var(--color-card-foreground)' }}
-          itemStyle={{ color: 'var(--color-card-foreground)' }}
+          {...TOOLTIP_PROPS}
           formatter={(v) => [String(v), 'Indexed URLs']}
         />
-        <Line type="monotone" dataKey="indexed" stroke="var(--color-primary)" strokeWidth={2} dot={false} isAnimationActive={false} />
+        <Line type="monotone" dataKey="indexed" stroke={CHART.indigo} strokeWidth={2} dot={false} isAnimationActive={false} />
       </LineChart>
     </ResponsiveContainer>
   )
@@ -129,7 +122,7 @@ function UrlDrawer({
         )}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {!detail && !error && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {!detail && !error && <PageLoading />}
 
         {detail && (
           <>
@@ -235,7 +228,7 @@ export function IndexingSection({ projectId, isDemo }: { projectId: string; isDe
   }, [projectId, issue, search, page, reload])
 
   if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!summary) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (!summary) return <PageLoading />
 
   if (summary.total === 0) {
     return (

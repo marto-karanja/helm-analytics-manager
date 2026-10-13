@@ -5,6 +5,7 @@ import { formatDateTime } from '@/lib/indexing'
 import { fetchSitemaps } from '@/lib/indexingApi'
 import type { SitemapInfo } from '@/lib/indexingTypes'
 import { formatNumber } from '@/lib/traffic'
+import { PageLoading } from '@/components/ui/skeleton'
 
 export function SitemapsSection({ projectId }: { projectId: string }) {
   const [data, setData] = React.useState<SitemapInfo | null>(null)
@@ -21,7 +22,7 @@ export function SitemapsSection({ projectId }: { projectId: string }) {
   }, [projectId])
 
   if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (!data) return <PageLoading />
 
   if (!data.has_search_console && data.sitemaps.length === 0) {
     return (

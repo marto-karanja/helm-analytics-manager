@@ -1,9 +1,10 @@
 import * as React from 'react'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Badge, SeverityBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { fetchTraffic } from '@/lib/api'
+import { AXIS_LINE, AXIS_TICK, CHART, TOOLTIP_PROPS } from '@/lib/chartTheme'
 import {
   fillGaps,
   formatCollectedAt,
@@ -13,6 +14,7 @@ import {
   isStale,
 } from '@/lib/traffic'
 import type { ProjectDetail, TrafficData, TrafficDay, TrafficTrend } from '@/lib/types'
+import { PageLoading } from '@/components/ui/skeleton'
 
 const RANGES = [
   { days: 28, label: '28 days' },
@@ -21,13 +23,6 @@ const RANGES = [
   { days: 480, label: '16 months' },
 ] as const
 
-const AXIS_TICK = { fontSize: 12, fill: 'var(--color-muted-foreground)' }
-const TOOLTIP_STYLE = {
-  background: 'var(--color-card)',
-  border: '1px solid var(--color-border)',
-  borderRadius: 6,
-  fontSize: 12,
-}
 
 interface Series {
   key: keyof TrafficDay
@@ -52,6 +47,7 @@ function MetricChart({
   decimals?: number
 }) {
   const hasData = series.some((s) => data.some((d) => d[s.key] !== null))
+  const gradientId = React.useId()
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -83,33 +79,36 @@ function MetricChart({
           <p className="py-8 text-center text-sm text-muted-foreground">No data for this source yet.</p>
         ) : (
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+            <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor={series[0].color} stopOpacity={0.25} />
+                  <stop offset="1" stopColor={series[0].color} stopOpacity={0} />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis
                 dataKey="metric_date"
                 tickFormatter={formatDay}
                 tick={AXIS_TICK}
-                stroke="var(--color-border)"
+                stroke={AXIS_LINE}
                 minTickGap={32}
               />
               <YAxis
                 tick={AXIS_TICK}
-                stroke="var(--color-border)"
+                stroke={AXIS_LINE}
                 reversed={reversed}
                 allowDecimals={decimals > 0}
                 domain={reversed ? ['auto', 'auto'] : [0, 'auto']}
                 width={48}
               />
               <Tooltip
-                contentStyle={TOOLTIP_STYLE}
+                {...TOOLTIP_PROPS}
                 labelFormatter={(label) => formatDay(String(label))}
                 formatter={(value) => (typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: decimals }) : '—')}
-                labelStyle={{ color: 'var(--color-card-foreground)' }}
-                itemStyle={{ color: 'var(--color-card-foreground)' }}
-                cursor={{ stroke: 'var(--color-border)' }}
               />
               {series.map((s) => (
-                <Line
+                <Area
                   key={s.key}
                   name={s.label}
                   type="monotone"
@@ -119,11 +118,12 @@ function MetricChart({
                   strokeDasharray={s.dashed ? '4 3' : undefined}
                   dot={false}
                   connectNulls={false}
+                  fill={series.length === 1 && !reversed ? `url(#${gradientId})` : 'none'}
                   isAnimationActive={false}
                   activeDot={{ r: 4, stroke: 'var(--color-card)', strokeWidth: 2 }}
                 />
               ))}
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         )}
       </CardContent>
@@ -302,7 +302,7 @@ export function TrafficSection({ project, isDemo }: { project: ProjectDetail; is
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {!traffic && !error && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {!traffic && !error && <PageLoading />}
       {traffic && traffic.days.length === 0 && (
         <Card>
           <CardContent className="p-4 text-sm text-muted-foreground">
@@ -318,19 +318,19 @@ export function TrafficSection({ project, isDemo }: { project: ProjectDetail; is
           <MetricChart
             title="Clicks"
             data={chartData}
-            series={[{ key: 'clicks', label: 'Clicks', color: 'var(--color-primary)' }]}
+            series={[{ key: 'clicks', label: 'Clicks', color: CHART.indigo }]}
           />
           <MetricChart
             title="Impressions"
             data={chartData}
-            series={[{ key: 'impressions', label: 'Impressions', color: 'var(--color-primary)' }]}
+            series={[{ key: 'impressions', label: 'Impressions', color: CHART.teal }]}
           />
           <MetricChart
             title="Sessions"
             hint="From Google Analytics 4. Today's value is partial."
             data={chartData}
             series={[
-              { key: 'sessions', label: 'Sessions', color: 'var(--color-primary)' },
+              { key: 'sessions', label: 'Sessions', color: CHART.sky },
               { key: 'engaged_sessions', label: 'Engaged sessions', color: 'var(--color-muted-foreground)', dashed: true },
             ]}
           />
@@ -338,7 +338,7 @@ export function TrafficSection({ project, isDemo }: { project: ProjectDetail; is
             title="Average position"
             hint="Lower is better, so the axis is flipped."
             data={chartData}
-            series={[{ key: 'avg_position', label: 'Average position', color: 'var(--color-primary)' }]}
+            series={[{ key: 'avg_position', label: 'Average position', color: CHART.orange }]}
             reversed
             decimals={1}
           />

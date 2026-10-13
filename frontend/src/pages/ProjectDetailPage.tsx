@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { fetchProject, updateProject } from '@/lib/api'
 import { formatNumber } from '@/lib/traffic'
 import type { ProjectDetail } from '@/lib/types'
+import { PageLoading } from '@/components/ui/skeleton'
 
 const EDITABLE_FIELDS = [
   { key: 'goals', label: 'Goals' },
@@ -104,7 +105,7 @@ export function ProjectDetailPage() {
     }
   }
 
-  if (!project) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (!project) return <PageLoading />
   const tab: TabKey = project.is_pipeline ? requestedKey : 'overview'
 
   return (

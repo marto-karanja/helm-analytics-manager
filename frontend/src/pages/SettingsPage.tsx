@@ -16,6 +16,7 @@ import {
 import { formatDateTime } from '@/lib/indexing'
 import type { McpToken, SettingsData } from '@/lib/indexingTypes'
 import type { Project } from '@/lib/types'
+import { PageLoading } from '@/components/ui/skeleton'
 
 const WEIGHTS = ['demand', 'gap', 'relevance', 'competition'] as const
 
@@ -354,7 +355,7 @@ export function SettingsPage() {
   }, [])
 
   if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (!data) return <PageLoading />
 
   return (
     <div className="flex flex-col gap-4">

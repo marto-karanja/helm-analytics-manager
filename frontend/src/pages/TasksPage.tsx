@@ -1,9 +1,12 @@
+import { ListChecks } from 'lucide-react'
+import { EmptyState } from '@/components/ui/empty-state'
 import * as React from 'react'
 import { Link } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { api } from '@/lib/api'
 import type { Task } from '@/lib/types'
+import { PageLoading } from '@/components/ui/skeleton'
 
 type TaskWithProject = Task & { project_name: string; project_slug: string }
 
@@ -20,8 +23,9 @@ export function TasksPage() {
     api.get<TaskWithProject[]>('/tasks').then((resp) => setTasks(resp.data))
   }, [])
 
-  if (!tasks) return <p className="text-sm text-muted-foreground">Loading…</p>
-  if (tasks.length === 0) return <p className="text-sm text-muted-foreground">Nothing open across any project.</p>
+  if (!tasks) return <PageLoading />
+  if (tasks.length === 0)
+    return <EmptyState icon={<ListChecks size={24} />} title="Nothing open" description="No open tasks across any project." />
 
   return (
     <div className="flex flex-col gap-2">

@@ -1,14 +1,17 @@
 import { FileText, LayoutGrid, Newspaper, LineChart, ListChecks, LogOut, Settings } from 'lucide-react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import * as React from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PageLoading } from '@/components/ui/skeleton'
 import { useAuth } from '@/contexts/AuthContext'
 
 export function Layout() {
   const { setToken, isDemo } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   function handleLogout() {
     setToken(null)
@@ -55,7 +58,11 @@ export function Layout() {
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
-        <Outlet />
+        <div key={location.pathname} className="page-enter">
+          <React.Suspense fallback={<PageLoading />}>
+            <Outlet />
+          </React.Suspense>
+        </div>
       </main>
     </div>
   )

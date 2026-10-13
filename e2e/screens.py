@@ -20,9 +20,19 @@ TOKEN_KEY = "helm_access_token"
 
 
 def settle(page: Page) -> None:
+    """Loaded means no "Loading" text and no skeleton on two checks in a row. One check is not enough: right
+    after a route change the old page can still be on screen, and a lazy page has a gap between its two loading states."""
     page.wait_for_load_state("networkidle")
-    page.wait_for_function("() => !document.body.innerText.includes('Loading')", timeout=20000)
-    page.wait_for_timeout(300)
+    quiet = 0
+    for _ in range(80):
+        loading = page.evaluate("document.body.innerText.includes('Loading') || !!document.querySelector('.animate-pulse')")
+        quiet = 0 if loading else quiet + 1
+        if quiet >= 2:
+            break
+        page.wait_for_timeout(250)
+    else:
+        raise TimeoutError("page still loading after 20s")
+    page.wait_for_timeout(200)
 
 
 def run_axe(page: Page, axe_src: str) -> list[str]:

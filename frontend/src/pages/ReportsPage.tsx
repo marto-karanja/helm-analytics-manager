@@ -11,6 +11,7 @@ import { downloadReportCsv, errorMessage, fetchCompare, fetchReport, fetchReport
 import { formatDateTime, ISSUE_LABEL } from '@/lib/indexing'
 import type { CompareData, IndexIssue, ReportAvailability, ReportCatalogItem, ReportCell, ReportData, ReportMeta, ReportQuery } from '@/lib/indexingTypes'
 import type { Project } from '@/lib/types'
+import { PageLoading } from '@/components/ui/skeleton'
 
 const FALLBACK_REPORTS: ReportCatalogItem[] = [
   { name: 'indexing', label: 'Indexing', blurb: 'Counts of URLs per issue for each site.', kind: 'as_of', compare_keys: ['project'], history: '' },
@@ -396,7 +397,7 @@ export function ReportsPage() {
       ))}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {!data && !error && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {!data && !error && <PageLoading />}
 
       {data && !(empty && outOfRange) && (
         <div className="max-h-[70vh] overflow-auto rounded-md border border-border" tabIndex={0}>

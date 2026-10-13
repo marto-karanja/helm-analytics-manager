@@ -13,6 +13,7 @@ import {
 } from '@/lib/indexingApi'
 import type { CandidateStatus, DecidableStatus, KeywordCandidate, KeywordList, KeywordRun } from '@/lib/indexingTypes'
 import { formatNumber } from '@/lib/traffic'
+import { PageLoading } from '@/components/ui/skeleton'
 
 const FILTERS: { value: CandidateStatus | 'all'; label: string }[] = [
   { value: 'proposed', label: 'Proposed' },
@@ -168,7 +169,7 @@ export function KeywordsSection({ projectId, isDemo }: { projectId: string; isDe
   }
 
   if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (!data) return <PageLoading />
 
   const rows = data.candidates
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id))

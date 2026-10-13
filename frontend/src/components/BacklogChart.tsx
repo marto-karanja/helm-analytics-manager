@@ -1,8 +1,8 @@
 import * as React from 'react'
+import { EmptyState } from '@/components/ui/empty-state'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { AXIS_LINE, AXIS_TICK, CHART, TOOLTIP_PROPS } from '@/lib/chartTheme'
 import type { PipelineSnapshot } from '@/lib/types'
-
-const AXIS_TICK = { fontSize: 12, fill: 'var(--color-muted-foreground)' }
 
 export function BacklogChart({ snapshots }: { snapshots: PipelineSnapshot[] }) {
   const data = React.useMemo(
@@ -10,7 +10,7 @@ export function BacklogChart({ snapshots }: { snapshots: PipelineSnapshot[] }) {
       [...snapshots]
         .reverse()
         .map((s) => ({
-          date: new Date(s.synced_at).toLocaleDateString(),
+          date: new Date(s.synced_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
           backlog: s.backlog_count,
           blocked: s.blocked_count,
         })),
@@ -18,30 +18,20 @@ export function BacklogChart({ snapshots }: { snapshots: PipelineSnapshot[] }) {
   )
 
   if (data.length === 0) {
-    return <p className="text-sm text-muted-foreground">No backlog history yet.</p>
+    return <EmptyState title="No backlog history yet" description="The chart appears after the pipeline has synced a few times." className="py-6" />
   }
 
   return (
     <ResponsiveContainer width="100%" height={220}>
       <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-        <XAxis dataKey="date" tick={AXIS_TICK} stroke="var(--color-border)" />
-        <YAxis tick={AXIS_TICK} stroke="var(--color-border)" allowDecimals={false} />
-        <Tooltip
-          contentStyle={{
-            background: 'var(--color-card)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 6,
-            fontSize: 12,
-          }}
-          labelStyle={{ color: 'var(--color-card-foreground)' }}
-          itemStyle={{ color: 'var(--color-card-foreground)' }}
-          cursor={{ stroke: 'var(--color-border)' }}
-        />
+        <XAxis dataKey="date" tick={AXIS_TICK} stroke={AXIS_LINE} minTickGap={32} />
+        <YAxis tick={AXIS_TICK} stroke={AXIS_LINE} allowDecimals={false} />
+        <Tooltip {...TOOLTIP_PROPS} />
         <Line
           type="monotone"
           dataKey="backlog"
-          stroke="var(--color-primary)"
+          stroke={CHART.indigo}
           strokeWidth={2}
           dot={false}
           activeDot={{ stroke: 'var(--color-card)' }}

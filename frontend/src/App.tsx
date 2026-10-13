@@ -1,14 +1,16 @@
+import * as React from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Layout } from '@/components/Layout'
 import { useAuth } from '@/contexts/AuthContext'
-import { ContentPage } from '@/pages/ContentPage'
 import { LoginPage } from '@/pages/LoginPage'
-import { OverviewPage } from '@/pages/OverviewPage'
-import { ReportsPage } from '@/pages/ReportsPage'
-import { SettingsPage } from '@/pages/SettingsPage'
-import { ProjectDetailPage } from '@/pages/ProjectDetailPage'
-import { TasksPage } from '@/pages/TasksPage'
-import { TrafficPage } from '@/pages/TrafficPage'
+
+const ContentPage = React.lazy(() => import('@/pages/ContentPage').then((m) => ({ default: m.ContentPage })))
+const OverviewPage = React.lazy(() => import('@/pages/OverviewPage').then((m) => ({ default: m.OverviewPage })))
+const ReportsPage = React.lazy(() => import('@/pages/ReportsPage').then((m) => ({ default: m.ReportsPage })))
+const SettingsPage = React.lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const ProjectDetailPage = React.lazy(() => import('@/pages/ProjectDetailPage').then((m) => ({ default: m.ProjectDetailPage })))
+const TasksPage = React.lazy(() => import('@/pages/TasksPage').then((m) => ({ default: m.TasksPage })))
+const TrafficPage = React.lazy(() => import('@/pages/TrafficPage').then((m) => ({ default: m.TrafficPage })))
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()

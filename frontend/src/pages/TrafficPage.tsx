@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { fetchTrafficOverview } from '@/lib/api'
 import { formatCollectedAt, formatNumber, formatPct, isStale } from '@/lib/traffic'
 import type { TrafficOverviewItem, TrafficTrend } from '@/lib/types'
+import { PageLoading } from '@/components/ui/skeleton'
 
 function TrendCell({ trend }: { trend: TrafficTrend | null }) {
   if (!trend) return <span className="text-muted-foreground">—</span>
@@ -30,7 +31,7 @@ export function TrafficPage() {
   }, [])
 
   if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!items) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (!items) return <PageLoading />
 
   const connected = items.filter((i) => i.configured)
   const notConnected = items.filter((i) => !i.configured)

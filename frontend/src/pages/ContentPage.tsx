@@ -1,14 +1,16 @@
 import * as React from 'react'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Newspaper } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { SeverityBadge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Table, TD, TH, THead, TR } from '@/components/ui/table'
 import { fetchContentDashboard } from '@/lib/api'
+import { AXIS_LINE, AXIS_TICK, CHART, TOOLTIP_PROPS } from '@/lib/chartTheme'
 import { formatNumber } from '@/lib/traffic'
 import type { ContentDashboard, ContentItem, ContentPoint } from '@/lib/types'
-
-const AXIS_TICK = { fontSize: 12, fill: 'var(--color-muted-foreground)' }
+import { PageLoading } from '@/components/ui/skeleton'
 
 function formatDays(days: number | null): string {
   if (days === null) return '—'
@@ -103,17 +105,12 @@ function ShareChart({ items }: { items: ContentItem[] }) {
     <ResponsiveContainer width="100%" height={Math.max(180, data.length * 36 + 48)}>
       <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, bottom: 0, left: 8 }}>
         <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
-        <XAxis type="number" tick={AXIS_TICK} stroke="var(--color-border)" allowDecimals={false} />
-        <YAxis type="category" dataKey="name" width={130} tick={AXIS_TICK} stroke="var(--color-border)" />
-        <Tooltip
-          contentStyle={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: 6, fontSize: 12 }}
-          labelStyle={{ color: 'var(--color-card-foreground)' }}
-          itemStyle={{ color: 'var(--color-card-foreground)' }}
-          cursor={{ fill: 'var(--color-muted)' }}
-        />
+        <XAxis type="number" tick={AXIS_TICK} stroke={AXIS_LINE} allowDecimals={false} />
+        <YAxis type="category" dataKey="name" width={160} tick={AXIS_TICK} stroke={AXIS_LINE} />
+        <Tooltip {...TOOLTIP_PROPS} cursor={{ fill: 'var(--color-muted)' }} />
         <Legend wrapperStyle={{ fontSize: 12 }} />
-        <Bar dataKey="Published" stackId="a" fill="var(--color-chart-1)" isAnimationActive={false} />
-        <Bar dataKey="In queue" stackId="a" fill="var(--color-chart-3)" isAnimationActive={false} />
+        <Bar dataKey="Published" stackId="a" fill={CHART.indigo} isAnimationActive={false} />
+        <Bar dataKey="In queue" stackId="a" fill={CHART.orange} isAnimationActive={false} />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -130,7 +127,7 @@ export function ContentPage() {
   }, [])
 
   if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (!data) return <PageLoading />
 
   const { totals, items } = data
   return (
@@ -144,9 +141,11 @@ export function ContentPage() {
       </div>
 
       {items.length === 0 ? (
-        <Card>
-          <CardContent className="p-4 text-sm text-muted-foreground">No publishing pipelines have synced yet.</CardContent>
-        </Card>
+        <EmptyState
+          icon={<Newspaper size={24} />}
+          title="No publishing pipelines have synced yet"
+          description="Once a pipeline pushes its counts, its published articles and queue appear here."
+        />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
