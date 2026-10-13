@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 /** A compact table in a scrolling frame: sticky header, row hover, tabular numerals. Use `numeric` cells for numbers. */
 export function Table({ className, ...props }: React.TableHTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="max-h-[70vh] overflow-auto rounded-lg border border-border bg-card shadow-card">
+    <div className="max-h-[70vh] overflow-auto rounded-lg border border-border bg-card shadow-card" tabIndex={0}>
       <table className={cn('w-full text-sm', className)} {...props} />
     </div>
   )

@@ -19,11 +19,12 @@ import type { Project } from '@/lib/types'
 
 const WEIGHTS = ['demand', 'gap', 'relevance', 'competition'] as const
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactElement<{ id?: string }> }) {
+  const id = React.useId()
   return (
     <div className="flex flex-col gap-1">
-      <Label>{label}</Label>
-      {children}
+      <Label htmlFor={id}>{label}</Label>
+      {React.cloneElement(children, { id })}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   )
@@ -291,7 +292,7 @@ function McpTokens() {
         </fieldset>
         {message && <p className="text-sm text-destructive">{message}</p>}
 
-        <div className="overflow-x-auto rounded-md border border-border">
+        <div className="overflow-x-auto rounded-md border border-border" tabIndex={0}>
           <table className="w-full text-sm">
             <thead className="bg-card text-left text-muted-foreground">
               <tr>

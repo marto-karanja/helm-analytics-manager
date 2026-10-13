@@ -51,7 +51,7 @@ export function TrafficPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
+        <div className="overflow-x-auto rounded-lg border border-border bg-card" tabIndex={0}>
           <table className="w-full text-sm">
             <thead className="text-left text-muted-foreground">
               <tr>

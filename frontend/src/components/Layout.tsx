@@ -17,12 +17,12 @@ export function Layout() {
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors sm:px-3 ${
-      isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+      isActive ? 'bg-accent text-accent-foreground shadow-[inset_0_-2px_0_var(--color-brand)]' : 'text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground'
     }`
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
+      <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/70">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-3 py-3 sm:px-4">
           <span className="flex items-center gap-2 text-sm font-semibold">
             <Logo size={28} />
@@ -54,7 +54,7 @@ export function Layout() {
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
         <Outlet />
       </main>
     </div>

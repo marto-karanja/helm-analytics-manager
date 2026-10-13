@@ -11,6 +11,7 @@ const badgeVariants = cva('inline-flex items-center gap-1.5 rounded-full px-2.5 
       green: 'bg-severity-green-soft text-severity-green-soft-foreground',
       yellow: 'bg-severity-yellow-soft text-severity-yellow-soft-foreground',
       red: 'bg-severity-red text-severity-red-foreground',
+      softred: 'bg-severity-red-soft text-severity-red-soft-foreground',
       muted: 'bg-muted text-muted-foreground',
     },
   },

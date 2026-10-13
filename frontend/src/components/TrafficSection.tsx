@@ -155,7 +155,7 @@ function TrendTile({ label, trend }: { label: string; trend: TrafficTrend | null
 function DataTable({ days }: { days: TrafficDay[] }) {
   const rows = [...days].reverse()
   return (
-    <div className="max-h-96 overflow-auto rounded-md border border-border">
+    <div className="max-h-96 overflow-auto rounded-md border border-border" tabIndex={0}>
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-card text-left text-muted-foreground">
           <tr>

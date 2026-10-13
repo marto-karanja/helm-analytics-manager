@@ -191,3 +191,25 @@ async def test_traffic_overview_for_demo_user_is_demo_only(client):
     items = (await client.get("/api/traffic/overview", headers=headers)).json()
     assert len(items) == 8
     assert all(i["slug"].startswith("demo-") and i["configured"] for i in items)
+
+
+async def test_traffic_overview_clicks_series_is_28_days_with_gaps_as_null(auth_client):
+    project = await _new_project(gsc_site_url="sc-domain:series.example")
+    last = date(2026, 9, 30)
+    async with async_session_maker() as session:
+        for offset, clicks in ((0, 7), (1, 5), (3, 2)):  # newest day, the day before, and one after a gap
+            session.add(TrafficDaily(project_id=project.id, metric_date=last - timedelta(days=offset), clicks=clicks))
+        await session.commit()
+
+    items = {i["project_id"]: i for i in (await auth_client.get("/api/traffic/overview")).json()}
+    series = items[str(project.id)]["clicks_series"]
+
+    assert len(series) == 28
+    assert series[-1] == 7 and series[-2] == 5 and series[-3] is None and series[-4] == 2
+    assert series[0] is None
+
+
+async def test_traffic_overview_clicks_series_is_empty_without_data(auth_client):
+    project = await _new_project()
+    items = {i["project_id"]: i for i in (await auth_client.get("/api/traffic/overview")).json()}
+    assert items[str(project.id)]["clicks_series"] == []

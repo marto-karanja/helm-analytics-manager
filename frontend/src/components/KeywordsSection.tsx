@@ -224,7 +224,7 @@ export function KeywordsSection({ projectId, isDemo }: { projectId: string; isDe
       </div>
       {notice && <p className="text-sm text-muted-foreground">{notice}</p>}
 
-      <div className="overflow-x-auto rounded-md border border-border">
+      <div className="overflow-x-auto rounded-md border border-border" tabIndex={0}>
         <table className="w-full text-sm">
           <thead className="bg-card text-left text-muted-foreground">
             <tr>

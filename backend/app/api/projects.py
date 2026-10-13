@@ -25,6 +25,7 @@ from app.schemas.project import (
 router = APIRouter(dependencies=[Depends(current_active_user)])
 
 SNAPSHOT_HISTORY_LIMIT = 30
+CLICKS_SERIES_DAYS = 28
 
 
 def _require_write_access(user: User) -> None:
@@ -135,6 +136,41 @@ async def get_project_traffic(
     return {"days": rows, "last_collected_at": await _last_collected_at(session, project_id)}
 
 
+async def _clicks_series(session: AsyncSession, project_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[int | None]]:
+    """Per project, the last CLICKS_SERIES_DAYS calendar days of clicks ending at its newest stored day (gaps are None)."""
+    if not project_ids:
+        return {}
+    newest = dict(
+        (
+            await session.execute(
+                select(TrafficDaily.project_id, func.max(TrafficDaily.metric_date))
+                .where(TrafficDaily.project_id.in_(project_ids))
+                .group_by(TrafficDaily.project_id)
+            )
+        ).all()
+    )
+    if not newest:
+        return {}
+    earliest = min(newest.values()) - timedelta(days=CLICKS_SERIES_DAYS - 1)
+    rows = (
+        await session.execute(
+            select(TrafficDaily.project_id, TrafficDaily.metric_date, TrafficDaily.clicks).where(
+                TrafficDaily.project_id.in_(newest), TrafficDaily.metric_date >= earliest
+            )
+        )
+    ).all()
+    by_project: dict[uuid.UUID, dict] = {}
+    for project_id, day, clicks in rows:
+        by_project.setdefault(project_id, {})[day] = clicks
+    return {
+        project_id: [
+            by_project.get(project_id, {}).get(last - timedelta(days=CLICKS_SERIES_DAYS - 1 - i))
+            for i in range(CLICKS_SERIES_DAYS)
+        ]
+        for project_id, last in newest.items()
+    }
+
+
 @router.get("/traffic/overview", response_model=list[TrafficOverviewItem])
 async def traffic_overview(
     user: User = Depends(current_active_user), session: AsyncSession = Depends(get_async_session)
@@ -153,6 +189,7 @@ async def traffic_overview(
             )
         ).all()
     )
+    series = await _clicks_series(session, [p.id for p in projects])
     items = []
     for project in projects:
         latest: TrafficSnapshot | None = project.traffic_snapshots[0] if project.traffic_snapshots else None
@@ -169,6 +206,7 @@ async def traffic_overview(
                 "alert_severity": latest.alert_severity if latest else None,
                 "alert_messages": latest.alert_messages if latest else None,
                 "last_collected_at": collected.get(project.id),
+                "clicks_series": series.get(project.id, []),
             }
         )
     return items

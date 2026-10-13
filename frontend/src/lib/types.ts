@@ -88,6 +88,8 @@ export interface TrafficOverviewItem {
   alert_severity: string | null
   alert_messages: { severity: string; message: string }[] | null
   last_collected_at: string | null
+  /** Daily clicks, last 28 days, oldest first; null is a missing day. Empty when nothing is stored. */
+  clicks_series: (number | null)[]
 }
 
 export interface ProjectDetail extends Project {

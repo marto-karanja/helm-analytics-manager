@@ -36,7 +36,7 @@ export function SitemapsSection({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-x-auto rounded-md border border-border">
+      <div className="overflow-x-auto rounded-md border border-border" tabIndex={0}>
         <table className="w-full text-sm">
           <thead className="bg-card text-left text-muted-foreground">
             <tr>

@@ -313,7 +313,7 @@ export function IndexingSection({ projectId, isDemo }: { projectId: string; isDe
         <span className="text-xs text-muted-foreground">{list ? `${formatNumber(list.total)} URLs` : ''}</span>
       </div>
 
-      <div className="overflow-x-auto rounded-md border border-border">
+      <div className="overflow-x-auto rounded-md border border-border" tabIndex={0}>
         <table className="w-full text-sm">
           <thead className="bg-card text-left text-muted-foreground">
             <tr>

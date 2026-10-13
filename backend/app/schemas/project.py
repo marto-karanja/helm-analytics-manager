@@ -122,6 +122,8 @@ class TrafficOverviewItem(BaseModel):
     alert_severity: str | None
     alert_messages: list | None
     last_collected_at: datetime | None
+    # Daily clicks for the last 28 days ending at the newest stored day, oldest first; a missing day is null.
+    clicks_series: list[int | None] = []
 
 
 class ProjectDetailRead(ProjectRead):

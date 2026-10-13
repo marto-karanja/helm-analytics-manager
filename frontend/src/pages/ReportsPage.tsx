@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Select } from '@/components/ui/input'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { fetchProjects } from '@/lib/api'
 import { downloadReportCsv, errorMessage, fetchCompare, fetchReport, fetchReportAvailability, fetchReportCatalog } from '@/lib/indexingApi'
 import { formatDateTime, ISSUE_LABEL } from '@/lib/indexing'
@@ -51,6 +52,10 @@ const BASIS: Record<ReportMeta['basis'], { label: string; variant: 'green' | 'mu
   reconstructed: { label: 'Reconstructed', variant: 'yellow' },
   none: { label: 'No history', variant: 'red' },
 }
+
+// Compare rows and the summary chips: tinted, with a mark so colour is not the only cue.
+const CHANGE_VARIANT: Record<string, 'green' | 'softred' | 'yellow' | 'muted'> = { new: 'green', gone: 'softred', changed: 'yellow', same: 'muted' }
+const CHANGE_MARK: Record<string, string> = { new: '+', gone: '−', changed: '~', same: '=' }
 
 const PERIODS = [7, 28, 90, 365]
 const GRANULARITIES = [
@@ -236,14 +241,13 @@ export function ReportsPage() {
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-semibold">Reports</h1>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Report">
-          {catalog.map((r) => (
-            <Button key={r.name} size="sm" variant={spec.name === r.name ? 'default' : 'outline'} aria-pressed={spec.name === r.name} onClick={() => pickReport(r.name)}>
-              {r.label}
-            </Button>
-          ))}
-        </div>
+      <div className="sticky top-[57px] z-20 -mx-4 flex flex-wrap items-center justify-between gap-2 bg-background/85 px-4 py-2 backdrop-blur-md">
+        <SegmentedControl
+          label="Report"
+          options={catalog.map((r) => ({ value: r.name, label: r.label }))}
+          value={spec.name}
+          onChange={pickReport}
+        />
         <div className="flex items-center gap-2">
           <Select className="w-auto" aria-label="Project" value={project} onChange={(e) => update({ project: e.target.value, date: null, compare: null })}>
             <option value="">All projects</option>
@@ -376,7 +380,8 @@ export function ReportsPage() {
           {compare && (
             <span className="flex gap-1 text-xs" data-testid="compare-summary">
               {(['new', 'gone', 'changed', 'same'] as const).map((s) => (
-                <Badge key={s} variant={s === 'changed' ? 'yellow' : s === 'same' ? 'muted' : 'outline'}>
+                <Badge key={s} variant={CHANGE_VARIANT[s]}>
+                  <span aria-hidden>{CHANGE_MARK[s]}</span>
                   {compare.summary[s]} {s}
                 </Badge>
               ))}
@@ -394,7 +399,7 @@ export function ReportsPage() {
       {!data && !error && <p className="text-sm text-muted-foreground">Loading…</p>}
 
       {data && !(empty && outOfRange) && (
-        <div className="max-h-[70vh] overflow-auto rounded-md border border-border">
+        <div className="max-h-[70vh] overflow-auto rounded-md border border-border" tabIndex={0}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-card text-left text-muted-foreground">
               <tr>
@@ -413,7 +418,10 @@ export function ReportsPage() {
                     if (isCompare && column === 'change') {
                       return (
                         <td key={j} className="px-3 py-1.5">
-                          <Badge variant={value === 'changed' ? 'yellow' : value === 'same' ? 'muted' : 'outline'}>{String(value)}</Badge>
+                          <Badge variant={CHANGE_VARIANT[String(value)] ?? 'outline'}>
+                            <span aria-hidden>{CHANGE_MARK[String(value)] ?? ''}</span>
+                            {String(value)}
+                          </Badge>
                         </td>
                       )
                     }

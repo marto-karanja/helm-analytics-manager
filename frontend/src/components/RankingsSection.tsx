@@ -95,7 +95,7 @@ export function RankingsSection({ projectId, isDemo }: { projectId: string; isDe
         ) : data.pages.length === 0 ? (
           <p className="text-sm text-muted-foreground">{data.note ?? 'No pages meet the impression threshold in this window.'}</p>
         ) : (
-          <div className="overflow-x-auto rounded-md border border-border">
+          <div className="overflow-x-auto rounded-md border border-border" tabIndex={0}>
             <table className="w-full text-sm">
               <thead className="bg-card text-left text-muted-foreground">
                 <tr>
