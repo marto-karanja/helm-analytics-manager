@@ -141,10 +141,12 @@ def run(base: str, headed: bool) -> int:
         seen = Collector(page, base)
 
         page.goto(f"{base}/login", wait_until="networkidle")
-        failures += not step("login page renders", page.get_by_role("button", name="Log in as Demo").is_visible())
+        failures += not step("login page renders (Sign in, no demo button)", page.get_by_role("button", name="Sign in").is_visible() and page.get_by_role("button", name="Log in as Demo").count() == 0)
         page.screenshot(path=str(OUT / "01-login.png"))
 
-        page.get_by_role("button", name="Log in as Demo").click()
+        token = context.request.post(f"{base}/api/auth/demo-login").json()["access_token"]
+        page.evaluate("t => localStorage.setItem('helm_access_token', t)", token)
+        page.goto(f"{base}/", wait_until="networkidle")
         page.wait_for_url(f"{base}/", timeout=20000)
         page.wait_for_load_state("networkidle")
         links = page.locator('a[href^="/projects/"]')

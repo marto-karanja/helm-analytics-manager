@@ -112,15 +112,17 @@ def main() -> int:
         step("a protocol-relative 'from' is ignored", page.url.startswith(base))
         ctx.close()
 
-        # 8. Demo sign-in and double-click protection.
+        # 8. No demo shortcut on the page, and a double-click on Sign in sends one request.
         ctx, page, _ = fresh(browser, base)
         page.goto(base + "/login")
+        step("the login page has no demo button", page.get_by_role("button", name="Log in as Demo").count() == 0 and "demo" not in page.inner_text("body").lower())
         calls: list[str] = []
-        page.on("request", lambda r: calls.append(r.url) if r.url.endswith("/api/auth/demo-login") else None)
-        btn = page.get_by_role("button", name="Log in as Demo")
-        btn.dblclick()
+        page.on("request", lambda r: calls.append(r.url) if r.url.endswith("/api/auth/login") else None)
+        page.get_by_label("Email").fill(a.email)
+        page.get_by_label("Password", exact=True).fill(a.password)
+        page.get_by_role("button", name="Sign in").dblclick()
         page.wait_for_url(base + "/", timeout=15000)
-        step("double-clicking the demo button sends one request", len(calls) == 1, f"{len(calls)} request(s)")
+        step("double-clicking Sign in sends one request", len(calls) == 1, f"{len(calls)} request(s)")
         ctx.close()
 
         # 9. Server errors and network loss read differently from a bad password.

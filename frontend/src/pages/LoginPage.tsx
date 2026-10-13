@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
-import { demoLogin, login, signInErrorMessage } from '@/lib/api'
+import { login, signInErrorMessage } from '@/lib/api'
 
 /** Only follow in-app paths, so a crafted link cannot send a signed-in user to another site. */
 function safeDestination(from: unknown): string {
@@ -19,41 +19,27 @@ export function LoginPage() {
   const [password, setPassword] = React.useState('')
   const [showPassword, setShowPassword] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  const [pending, setPending] = React.useState<'login' | 'demo' | null>(null)
+  const [pending, setPending] = React.useState(false)
   const { setToken, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const destination = safeDestination((location.state as { from?: unknown } | null)?.from)
 
   // Already signed in (for instance a bookmarked /login): go straight in.
-  if (isAuthenticated && pending === null) return <Navigate to={destination} replace />
+  if (isAuthenticated && !pending) return <Navigate to={destination} replace />
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (pending) return
     setError(null)
-    setPending('login')
+    setPending(true)
     try {
       const token = await login(email.trim(), password)
       setToken(token)
       navigate(destination, { replace: true })
     } catch (err) {
       setError(signInErrorMessage(err, 'Invalid email or password.'))
-      setPending(null)
-    }
-  }
-
-  async function handleDemoLogin() {
-    if (pending) return
-    setError(null)
-    setPending('demo')
-    try {
-      const token = await demoLogin()
-      setToken(token)
-      navigate(destination, { replace: true })
-    } catch (err) {
-      setError(signInErrorMessage(err, 'Could not start the demo session.'))
-      setPending(null)
+      setPending(false)
     }
   }
 
@@ -112,19 +98,10 @@ export function LoginPage() {
               <div id="login-error" role="alert" aria-live="assertive">
                 {error && <p className="text-sm text-destructive">{error}</p>}
               </div>
-              <Button type="submit" disabled={pending !== null}>
-                {pending === 'login' ? 'Signing in…' : 'Sign in'}
+              <Button type="submit" disabled={pending}>
+                {pending ? 'Signing in…' : 'Sign in'}
               </Button>
             </form>
-            <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="h-px flex-1 bg-border" />
-              or
-              <div className="h-px flex-1 bg-border" />
-            </div>
-            <Button type="button" variant="outline" className="mt-4 w-full" disabled={pending !== null} onClick={handleDemoLogin}>
-              {pending === 'demo' ? 'Starting demo…' : 'Log in as Demo'}
-            </Button>
-            <p className="mt-2 text-center text-xs text-muted-foreground">The demo is read-only and uses sample data.</p>
             <div className="mt-4 flex justify-center">
               <ThemeToggle />
             </div>
