@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Layout } from '@/components/Layout'
 import { useAuth } from '@/contexts/AuthContext'
 import { ContentPage } from '@/pages/ContentPage'
@@ -12,7 +12,9 @@ import { TrafficPage } from '@/pages/TrafficPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
-  if (!isAuthenticated) return <Navigate to="/login" replace />
+  const location = useLocation()
+  // Remember where the user was going, so signing in lands there instead of on the overview.
+  if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
   return <>{children}</>
 }
 

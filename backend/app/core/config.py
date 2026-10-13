@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     demo_mode_seed: bool = False
     allow_registration: bool = False
     access_token_lifetime_seconds: int = 3600 * 24
+    # Attempts per client address per window on the unauthenticated auth endpoints.
+    login_rate_limit: int = 10
+    demo_login_rate_limit: int = 30
+    auth_rate_window_seconds: int = 300
     google_credentials_file: str = ""
     collect_interval_hours: int = 24
     collect_backfill_days: int = 480

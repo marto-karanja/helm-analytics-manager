@@ -5,13 +5,37 @@ export const TOKEN_STORAGE_KEY = 'helm_access_token'
 
 export const api = axios.create({ baseURL: '/api' })
 
+/** Fired when the server rejects the stored token (expired or revoked), so the app can sign the user out. */
+export const UNAUTHORIZED_EVENT = 'helm:unauthorized'
+const PUBLIC_AUTH_PATHS = ['/auth/login', '/auth/demo-login']
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_STORAGE_KEY)
-  if (token) {
+  // Sign-in requests never carry a (possibly stale) token.
+  if (token && !PUBLIC_AUTH_PATHS.includes(config.url ?? '')) {
     config.headers.Authorization = `Bearer ${token}`
   }
   return config
 })
+
+api.interceptors.response.use(undefined, (error) => {
+  const sentToken = Boolean(error?.config?.headers?.Authorization)
+  if (axios.isAxiosError(error) && error.response?.status === 401 && sentToken) {
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
+  }
+  return Promise.reject(error)
+})
+
+/** A sentence for the sign-in form that says what actually went wrong. */
+export function signInErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    if (!error.response) return 'Cannot reach Helm. Check your connection and try again.'
+    const { status, data } = error.response
+    if (status === 429) return typeof data?.detail === 'string' ? data.detail : 'Too many attempts. Wait a few minutes and try again.'
+    if (status >= 500) return 'Helm had a problem on its side. Try again in a moment.'
+  }
+  return fallback
+}
 
 export async function login(email: string, password: string): Promise<string> {
   const body = new URLSearchParams({ username: email, password })

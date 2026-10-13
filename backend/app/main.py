@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import admin, auth, content, indexing, keywords, projects, reports, sync, v1
 from app.core.config import settings
 from app.core.demo_seed import seed_demo_data
+from app.core.ratelimit import rate_limit_middleware
 from app.db.session import async_session_maker
 
 
@@ -19,6 +20,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Helm Analytics Manager", version="0.1.0", lifespan=lifespan)
 
+app.middleware("http")(rate_limit_middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_hosts,

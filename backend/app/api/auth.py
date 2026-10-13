@@ -1,6 +1,7 @@
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi_users.exceptions import UserAlreadyExists
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,8 +41,11 @@ async def demo_login(
     result = await session.execute(select(User).where(User.email == DEMO_EMAIL))
     user = result.scalar_one_or_none()
     if user is None:
-        user = await user_manager.create(
-            UserCreate(email=DEMO_EMAIL, password=secrets.token_urlsafe(32), is_demo=True)
-        )
+        try:
+            user = await user_manager.create(
+                UserCreate(email=DEMO_EMAIL, password=secrets.token_urlsafe(32), is_demo=True)
+            )
+        except UserAlreadyExists:  # two first-ever calls raced; the other one created it
+            user = (await session.execute(select(User).where(User.email == DEMO_EMAIL))).scalar_one()
     strategy = auth_backend.get_strategy()
     return await auth_backend.login(strategy, user)

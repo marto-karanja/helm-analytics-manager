@@ -99,7 +99,7 @@ def main():
             page = browser.new_page()
             page.goto(a.base + "/login", wait_until="networkidle")
             page.get_by_label("Email").fill(a.email)
-            page.get_by_label("Password").fill(a.password)
+            page.get_by_label("Password", exact=True).fill(a.password)
             page.get_by_role("button", name="Sign in").click()
             page.wait_for_url(a.base + "/", timeout=15000)
             print("[ok] owner login form")

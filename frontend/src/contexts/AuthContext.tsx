@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { fetchMe, TOKEN_STORAGE_KEY } from '@/lib/api'
+import { fetchMe, TOKEN_STORAGE_KEY, UNAUTHORIZED_EVENT } from '@/lib/api'
 
 interface AuthContextValue {
   token: string | null
@@ -25,6 +25,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then((me) => setIsDemo(me.is_demo))
       .catch(() => setIsDemo(false))
   }, [token])
+
+  // The server rejected our token (expired or revoked): drop it so the route guard sends us to the sign-in page.
+  React.useEffect(() => {
+    const onUnauthorized = () => {
+      localStorage.removeItem(TOKEN_STORAGE_KEY)
+      setTokenState(null)
+    }
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized)
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized)
+  }, [])
 
   const setToken = React.useCallback((next: string | null) => {
     if (next) {

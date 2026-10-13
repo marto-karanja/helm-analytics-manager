@@ -84,6 +84,14 @@ async def seeded_project():
 
 
 @pytest.fixture(autouse=True)
+def _reset_auth_rate_limit():
+    from app.core import ratelimit
+
+    ratelimit.reset()
+    yield
+
+
+@pytest.fixture(autouse=True)
 def no_real_network(monkeypatch):
     """Indexing jobs fetch live pages; no test may reach the network by accident."""
     from app.indexing import jobs, signals

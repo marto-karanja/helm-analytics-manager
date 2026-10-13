@@ -1,81 +1,119 @@
+import { Eye, EyeOff } from 'lucide-react'
 import * as React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
-import { demoLogin, login } from '@/lib/api'
+import { demoLogin, login, signInErrorMessage } from '@/lib/api'
+
+/** Only follow in-app paths, so a crafted link cannot send a signed-in user to another site. */
+function safeDestination(from: unknown): string {
+  return typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') && !from.startsWith('/login') ? from : '/'
+}
 
 export function LoginPage() {
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
+  const [showPassword, setShowPassword] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  const [loading, setLoading] = React.useState(false)
-  const [demoLoading, setDemoLoading] = React.useState(false)
-  const { setToken } = useAuth()
+  const [pending, setPending] = React.useState<'login' | 'demo' | null>(null)
+  const { setToken, isAuthenticated } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const destination = safeDestination((location.state as { from?: unknown } | null)?.from)
+
+  // Already signed in (for instance a bookmarked /login): go straight in.
+  if (isAuthenticated && pending === null) return <Navigate to={destination} replace />
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (pending) return
     setError(null)
-    setLoading(true)
+    setPending('login')
     try {
-      const token = await login(email, password)
+      const token = await login(email.trim(), password)
       setToken(token)
-      navigate('/')
-    } catch {
-      setError('Invalid email or password.')
-    } finally {
-      setLoading(false)
+      navigate(destination, { replace: true })
+    } catch (err) {
+      setError(signInErrorMessage(err, 'Invalid email or password.'))
+      setPending(null)
     }
   }
 
   async function handleDemoLogin() {
+    if (pending) return
     setError(null)
-    setDemoLoading(true)
+    setPending('demo')
     try {
       const token = await demoLogin()
       setToken(token)
-      navigate('/')
-    } catch {
-      setError('Could not start the demo session.')
-    } finally {
-      setDemoLoading(false)
+      navigate(destination, { replace: true })
+    } catch (err) {
+      setError(signInErrorMessage(err, 'Could not start the demo session.'))
+      setPending(null)
     }
   }
 
   return (
     <div className="grid min-h-screen bg-background lg:grid-cols-2">
       <BrandPanel />
-      <div className="flex items-center justify-center p-4 sm:p-8">
+      <main className="flex items-center justify-center p-4 sm:p-8">
         <Card className="w-full max-w-sm">
           <CardHeader>
             <Logo size={40} tagline className="mb-2 lg:hidden" />
-            <CardTitle className="sr-only">Helm Analytics Manager</CardTitle>
+            <h1 className="sr-only">Sign in to Helm Analytics Manager</h1>
             <CardDescription>Sign in to view your portfolio.</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="password">Password</Label>
                 <Input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  id="email"
+                  type="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? 'login-error' : undefined}
                   required
                 />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Signing in…' : 'Sign in'}
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? 'login-error' : undefined}
+                    className="pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-pressed={showPassword}
+                    className="absolute inset-y-0 right-0 grid w-10 place-items-center rounded-r-md text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
+                  </button>
+                </div>
+              </div>
+              <div id="login-error" role="alert" aria-live="assertive">
+                {error && <p className="text-sm text-destructive">{error}</p>}
+              </div>
+              <Button type="submit" disabled={pending !== null}>
+                {pending === 'login' ? 'Signing in…' : 'Sign in'}
               </Button>
             </form>
             <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
@@ -83,8 +121,8 @@ export function LoginPage() {
               or
               <div className="h-px flex-1 bg-border" />
             </div>
-            <Button type="button" variant="outline" className="mt-4 w-full" disabled={demoLoading} onClick={handleDemoLogin}>
-              {demoLoading ? 'Starting demo…' : 'Log in as Demo'}
+            <Button type="button" variant="outline" className="mt-4 w-full" disabled={pending !== null} onClick={handleDemoLogin}>
+              {pending === 'demo' ? 'Starting demo…' : 'Log in as Demo'}
             </Button>
             <p className="mt-2 text-center text-xs text-muted-foreground">The demo is read-only and uses sample data.</p>
             <div className="mt-4 flex justify-center">
@@ -92,7 +130,7 @@ export function LoginPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </main>
     </div>
   )
 }
@@ -100,13 +138,16 @@ export function LoginPage() {
 /** The brand side of the login screen: gradient, tagline and an abstract chart. Hidden on small screens. */
 function BrandPanel() {
   return (
-    <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#4f46e5] via-[#4f58d8] to-[#0f9d8f] p-10 text-white lg:flex lg:flex-col lg:justify-between">
+    <div
+      aria-hidden
+      className="relative hidden overflow-hidden bg-gradient-to-br from-[#4338ca] via-[#3b4cc0] to-[#0d6f66] p-10 text-white lg:flex lg:flex-col lg:justify-between"
+    >
       <Logo size={44} className="text-white" />
       <div className="relative z-10 max-w-md">
-        <h2 className="text-3xl font-semibold leading-tight tracking-tight">See what search is doing to every site you run</h2>
-        <p className="mt-3 text-sm text-white/85">Traffic, indexing, keywords and publishing queues in one place.</p>
+        <p className="text-3xl font-semibold leading-tight tracking-tight">See what search is doing to every site you run</p>
+        <p className="mt-3 text-sm text-white">Traffic, indexing, keywords and publishing queues in one place.</p>
       </div>
-      <svg aria-hidden viewBox="0 0 520 300" className="pointer-events-none absolute inset-x-0 bottom-0 h-72 w-full opacity-40" preserveAspectRatio="none">
+      <svg viewBox="0 0 520 300" className="pointer-events-none absolute inset-x-0 bottom-0 h-72 w-full opacity-30" preserveAspectRatio="none">
         <defs>
           <linearGradient id="login-fill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#fff" stopOpacity="0.45" />
